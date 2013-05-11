@@ -145,7 +145,7 @@ class Slave(object):
             os.kill(self.process.pid, signal.SIGCONT)
             self.process.stdin.write(message)
             result = self.process.stdout.readline()
-        except OSError, IOError:
+        except (OSError, IOError):
             # process has died
             return ''
         finally:
