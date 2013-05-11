@@ -79,12 +79,10 @@ def create_slave_env(name):
 
 
 def get_process_children(pid):
-    p = subprocess.Popen('ps --no-headers -o pid --ppid %d' % pid, shell=True,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
+    process = subprocess.Popen('ps --no-headers -o pid --ppid %d' % pid, shell=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
     return [int(p) for p in stdout.split()]
-
-
 
 
 class Slave(object):
@@ -350,3 +348,9 @@ class SnakeJudge(Judge):
             print
             self.r.set('board', str(self.board))
             time.sleep(1)
+
+
+# Messages:
+# reload_slave;<slave_id>;<slave_name>;<slave_code>
+
+# {snakes: [{'color': '#ffd', 'name': 'Whatever',
