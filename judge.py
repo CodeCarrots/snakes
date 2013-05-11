@@ -396,12 +396,10 @@ class GameLoopThread(threading.Thread):
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
     thread = GameLoopThread(judge)
+    thread.daemon = True
     thread.start()
     while True:
         # reload_slave;<slave_id>;<slave_name>;<slave_code>
-        r = judge.r.blpop('commands', 5)
-        if r is None:
-            continue
-        _, message = r
+        _, message = judge.r.blpop('commands')
         command, slave_id, slave_name, slave_code = message.split(';', 3)
         judge.commands.put((command, slave_id, slave_name, slave_code))
