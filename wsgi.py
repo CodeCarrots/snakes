@@ -27,7 +27,7 @@ def move(board):
 while True:
     board = [sys.stdin.readline() for _ in range(HEIGHT)]
     sys.stdout.write(move(board))
-    sys.stdout.write('\n')
+    sys.stdout.write('\\n')
 """
 
 @app.route('/')
@@ -35,15 +35,18 @@ while True:
 def board(key=None):
     snake_name = 'Annonymous'
     snake_code = SCRIPT
+    snake_color = '#fff'
 
     if key is not None:
         snake_name = r.get('snake:%s:name' % key) or ''
         snake_code = r.get('snake:%s:code' % key) or SCRIPT
+        snake_color = r.get('snake:%s:color' % key) or '#fff'
     return render_template('board.html',
                            board=r.get('board'),
                            key=key or '',
                            name=snake_name,
-                           code=snake_code)
+                           code=snake_code,
+                           color=snake_color)
 
 
 @app.route('/board')
@@ -70,4 +73,4 @@ def reload_code():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()

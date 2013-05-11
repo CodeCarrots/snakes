@@ -240,12 +240,13 @@ class Board(object):
 
 
 class Snake(object):
-    def __init__(self, parts=None, direction=None, name='annonymous'):
+    def __init__(self, parts=None, direction=None, color=None, name='annonymous'):
         self.parts = deque(parts) if parts is not None else deque([Point(4, 4)])
         self.direction = direction if direction is not None else 'right'
         self.ate_apple = False
         self.dead = False
         self.name = name
+        self.color = color
 
     @property
     def head(self):
@@ -275,7 +276,8 @@ class Snake(object):
     def as_dict(self):
         return {'name': self.name,
                 'parts': [[p.x, p.y] for p in self.parts],
-                'dead': self.dead}
+                'dead': self.dead,
+                'color': self.color}
 
 
 class SnakeJudge(Judge):
@@ -289,15 +291,16 @@ class SnakeJudge(Judge):
         self.snakes = {}
         self.r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
-    def add_slave(self, args, key):
+    def add_slave(self, args, key, color):
         slave = super(SnakeJudge, self).add_slave(args)
-        snake = self.spawn_snake()
+        snake = self.spawn_snake(color)
         self.snakes[key] = (slave, snake)
+        return key
 
-    def spawn_snake(self):
+    def spawn_snake(self, color):
         p = self.board.random_empty_field()
         self.board[p.x, p.y] = '#'
-        return Snake([p])
+        return Snake([p], color=color)
 
     def spawn_apple(self):
         p = self.board.random_empty_field()
@@ -366,7 +369,7 @@ class SnakeJudge(Judge):
                 if slave.process.poll() is not None:
                     print 'DEAD'
                     print 'Reviving...'
-                    self.snakes[key] = (slave, self.spawn_snake())
+                    self.snakes[key] = (slave, self.spawn_snake(snake.color))
                     slave.run()
                     continue
 
@@ -425,7 +428,8 @@ while True:
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
     for _ in range(3):
-        judge.add_slave(SCRIPT, ''.join(random.choice(string.hexdigits) for _ in range(6)))
+        key = judge.add_slave(SCRIPT, ''.join(random.choice(string.hexdigits) for _ in range(6)), color='#' + ''.join(random.choice(string.hexdigits) for _ in range(3)))
+        judge.r.set('snake:%s:color' % key, judge.snakes[key][1].color)
 
     print judge.snakes.keys()
 
