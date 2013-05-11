@@ -4,7 +4,7 @@ var HEIGHT = 60;
 var board = {snakes: [], apples: []};
 var canvas = document.getElementById('canvas');
 var c = canvas.getContext('2d');
-
+var leaderboard = document.getElementById('leaderboard');
 
 function reloadBoard() {
     var xhr = new XMLHttpRequest();
@@ -19,6 +19,21 @@ function reloadBoard() {
 }
 
 reloadBoard();
+
+
+function reloadLeaderboard() {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+	if (xhr.readyState === 4 && xhr.status === 200) {
+            leaderboard.innerHTML = xhr.responseText;
+	}
+    }
+    xhr.open('GET', '/leaderboard', true);
+    xhr.send();
+    setTimeout(reloadBoard, 5000);
+}
+
+reloadLeaderboard();
 
 
 function render() {
