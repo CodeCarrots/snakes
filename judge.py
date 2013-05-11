@@ -433,8 +433,9 @@ while True:
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
     for _ in range(3):
-        key = judge.add_slave(SCRIPT, ''.join(random.choice(string.hexdigits) for _ in range(6)), color='#' + ''.join(random.choice(string.hexdigits) for _ in range(3)))
-        judge.r.set('snake:%s:color' % key, judge.snakes[key][1].color)
+        color = ('#' + ''.join(random.choice(string.hexdigits) for _ in range(3))).lower()
+        key = judge.add_slave(SCRIPT, ''.join(random.choice(string.hexdigits) for _ in range(6)), color=color)
+        judge.r.set('snake:%s:color' % key, color)
 
     print judge.snakes.keys()
 

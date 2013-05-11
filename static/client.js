@@ -24,9 +24,10 @@ reloadBoard();
 function render() {
     c.clearRect(0, 0, WIDTH * 10, HEIGHT * 10);
     var i, j, snake, part, apple;
-    c.fillStyle = '#000000';
     for (i = 0; i < board.snakes.length; i++) {
         snake = board.snakes[i];
+        c.fillStyle = snake.color === COLOR ? '#000' : '#999';
+
         if (snake.dead) {
             continue;
         }
