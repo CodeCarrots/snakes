@@ -290,6 +290,7 @@ class SnakeJudge(Judge):
         self.turn = 0
         self.snakes = {}
         self.r = redis.StrictRedis(host='localhost', port=6379, db=0)
+        self.leaderboard = dict(self.r.zrevrange('leaderboard', 0, -1, withscores=True))
 
     def add_slave(self, args, key, color):
         slave = super(SnakeJudge, self).add_slave(args)
@@ -359,7 +360,9 @@ class SnakeJudge(Judge):
 
     def update_leaderboard(self):
         for key, (slave, snake) in self.snakes.items():
-            self.r.zadd('leaderboard', len(snake.parts), key)
+            if self.leaderboard[key] < len(snake.parts):
+                self.leaderboard[key] = len(snake.parts)
+                self.r.zadd('leaderboard', len(snake.parts), key)
 
     def run(self):
         for slave in self.slaves:

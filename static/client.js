@@ -30,7 +30,7 @@ function reloadLeaderboard() {
     }
     xhr.open('GET', '/leaderboard', true);
     xhr.send();
-    setTimeout(reloadBoard, 5000);
+    setTimeout(reloadLeaderboard, 5000);
 }
 
 reloadLeaderboard();
