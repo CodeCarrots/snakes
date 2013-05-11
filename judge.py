@@ -260,7 +260,8 @@ class Snake(object):
     def as_dict(self):
         return {'name': '',
                 'parts': [[p.x, p.y] for p in self.parts],
-                'color': '#000'}
+                'color': '#000',
+                'dead': self.dead}
 
 
 class SnakeJudge(Judge):

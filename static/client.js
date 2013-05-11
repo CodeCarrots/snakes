@@ -27,11 +27,9 @@ function render() {
     c.fillStyle = '#000000';
     for (i = 0; i < board.snakes.length; i++) {
         snake = board.snakes[i];
-        // if (snake.dead) {
-        //     c.fillStyle = '#999999';
-        // } else {
-        //     c.fillStyle = '#000000';
-        // }
+        if (snake.dead) {
+            continue;
+        }
 
         for (j = 0; j < snake.parts.length; j++) {
             part = snake.parts[j];
