@@ -49,7 +49,7 @@ while True:
     sys.stdout.write('\n')
 """
 
-judge = SnakeJudge()
+judge = SnakeJudge(80, 60)
 for i in range(3):
     judge.add_slave(SCRIPT3)
 for i in range(3):

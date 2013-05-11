@@ -196,6 +196,7 @@ class Board(object):
         self.height = height
         self.fields = [['.'] * width for _ in range(height)]
         self.empty_fields = set(Point(x, y) for x in range(width) for y in range(height))
+        self.apples = set()
 
     def __getitem__(self, (x, y)):
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
@@ -208,6 +209,11 @@ class Board(object):
 
         self.fields[y][x] = value
 
+        if value == 'o':
+            self.apples.add(Point(x, y))
+        else:
+            self.apples.discard(Point(x, y))
+
         if value == '.':
             self.empty_fields.add(Point(x, y))
         else:
@@ -217,6 +223,9 @@ class Board(object):
         if len(self.empty_fields) == 0:
             return None
         return random.sample(self.empty_fields, 1)[0]
+
+    def apples(self):
+        return self.apples
 
     def __str__(self):
         result = []
@@ -322,7 +331,7 @@ class SnakeJudge(Judge):
 
     def as_dict(self):
         return {'snakes': [s.as_dict() for s in self.snakes],
-                'apples': []}
+                'apples': [[p.x, p.y] for p in self.board.apples]}
 
     def run(self):
         for slave in self.slaves:
