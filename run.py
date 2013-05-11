@@ -11,7 +11,7 @@ for i in range(10):
 SCRIPT2 = r"""
 import sys, random
 while True:
-    for x in range(10):
+    for x in range(60):
         sys.stdin.readline()
     sys.stdout.write(random.choice(['left', 'right', 'up', 'down']))
     sys.stdout.write('\n')
@@ -41,7 +41,7 @@ def possible_moves(board):
 
 while True:
     board = []
-    for _ in range(10):
+    for _ in range(60):
         board.append(sys.stdin.readline()[:-1])
 
     moves = possible_moves(board)
@@ -52,6 +52,6 @@ while True:
 judge = SnakeJudge(80, 60)
 for i in range(3):
     judge.add_slave(SCRIPT3)
-for i in range(3):
+for i in range(6):
     judge.add_slave(SCRIPT2)
 judge.run()
