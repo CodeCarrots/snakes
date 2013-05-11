@@ -6,6 +6,7 @@ from flask import Flask, render_template, request, redirect, url_for
 app = Flask(__name__)
 r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
+
 SCRIPT = """\
 import sys, random
 
@@ -38,9 +39,9 @@ def board(key=None):
     snake_color = '#fff'
 
     if key is not None:
-        snake_name = r.get('snake:%s:name' % key) or ''
-        snake_code = r.get('snake:%s:code' % key) or SCRIPT
-        snake_color = r.get('snake:%s:color' % key) or '#fff'
+        snake_name = (r.get('snake:%s:name' % key) or '').decode('utf-8')
+        snake_code = (r.get('snake:%s:code' % key) or SCRIPT).decode('utf-8')
+        snake_color = (r.get('snake:%s:color' % key) or '#fff').decode('utf-8')
     return render_template('board.html',
                            board=r.get('board'),
                            key=key or '',
@@ -51,12 +52,19 @@ def board(key=None):
 
 @app.route('/board')
 def check_board():
-    return r.get('snakes') or json.dumps({'snakes': []})
+    snakes = r.get('snakes')
+    if snakes is not None:
+        return snakes.decode('utf-8')
+    else:
+        return json.dumps({'snakes': []})
 
 
 def snake_name(key):
     name = r.get('snake:%s:name' % key)
-    return name if name is not None else 'Annonymous'
+    if name is not None:
+        return name.decode('utf-8')
+    else:
+        return u'Annonymous'
 
 
 @app.route('/leaderboard')
@@ -73,12 +81,14 @@ def reload_code():
         or len(request.form['slave_name']) == 0
         or len(request.form['slave_code']) == 0):
         return redirect(url_for('board'))
-    command = 'reload_slave;%s;%s;%s' % (request.form['slave_id'],
-                                         request.form['slave_name'],
-                                         request.form['slave_code'])
-    r.rpush('commands', command)
-    r.set('snake:%s:name' % request.form['slave_id'], request.form['slave_name'])
-    r.set('snake:%s:code' % request.form['slave_id'], request.form['slave_code'])
+    command = u'reload_slave;%s;%s;%s' % (request.form['slave_id'],
+                                          request.form['slave_name'],
+                                          request.form['slave_code'])
+    r.rpush('commands', command.encode('utf-8'))
+    r.set('snake:%s:name' % request.form['slave_id'].encode('utf-8'),
+          request.form['slave_name'].encode('utf-8'))
+    r.set('snake:%s:code' % request.form['slave_id'].encode('utf-8'),
+          request.form['slave_code'].encode('utf-8'))
 
     return redirect(url_for('board', key=request.form['slave_id']))
 

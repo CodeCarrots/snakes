@@ -419,6 +419,7 @@ class RedisCommandThread(threading.Thread):
         while True:
             # reload_slave;<slave_id>;<slave_name>;<slave_code>
             _, message = judge.r.blpop('commands')
+            message = message.decode('utf-8')
             command, slave_id, slave_name, slave_code = message.split(';', 3)
             judge.commands.put((command, slave_id, slave_name, slave_code))
 
