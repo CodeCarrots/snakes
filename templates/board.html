@@ -15,7 +15,7 @@
 	<script type="text/javascript" src="/static/client.js"></script>
 	<form action="/reload_slave" method="POST">
 	    <label for="slave_name">Nazwa <input id="slave_name" type="text" name="slave_name" value="" /></label>
-	    <label for="slave_id">Klucz <input type="text" name="slave_id" value="" /></label>
+	    <label for="slave_id">Klucz <input type="text" name="slave_id" value="{{ key }}" /></label>
 	    <label for="slave_code">Kod <textarea name="slave_code" rows="24" cols="80">
 import sys, random
 
@@ -26,6 +26,7 @@ WIDTH, HEIGHT = 80, 60
 # Board is a list of strings (board rows), where:
 #  - o = apple
 #  - # = snake
+#  - H = head of our snake
 #  - . = empty field
 #
 # Move should return 'left', 'right', 'up' or 'down'

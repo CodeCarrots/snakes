@@ -10,7 +10,7 @@ r = redis.StrictRedis(host='localhost', port=6379, db=0)
 @app.route('/')
 @app.route('/snake/<key>')
 def board(key=None):
-    return render_template('board.html', board=r.get('board'), key=key)
+    return render_template('board.html', board=r.get('board'), key=key or '')
 
 
 @app.route('/board')
