@@ -8,12 +8,12 @@ import stat
 import StringIO
 import subprocess
 import sys
+import string
 import threading
 import time
 import json
 import Queue
 from collections import namedtuple, deque, defaultdict
-
 import redis
 
 
@@ -283,17 +283,18 @@ class SnakeJudge(Judge):
         self.height = height
         self.board = Board(width, height)
         self.turn = 0
-        self.snakes = []
+        self.snakes = {}
         self.r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
-    def add_slave(self, args):
-        super(SnakeJudge, self).add_slave(args)
-        self.spawn_snake()
+    def add_slave(self, args, key):
+        slave = super(SnakeJudge, self).add_slave(args)
+        snake = self.spawn_snake()
+        self.snakes[key] = (slave, snake)
 
     def spawn_snake(self):
         p = self.board.random_empty_field()
         self.board[p.x, p.y] = '#'
-        self.snakes.append(Snake([p]))
+        return Snake([p])
 
     def spawn_apple(self):
         p = self.board.random_empty_field()
@@ -333,7 +334,7 @@ class SnakeJudge(Judge):
         self.turn += 1
 
     def as_dict(self):
-        return {'snakes': [s.as_dict() for s in self.snakes],
+        return {'snakes': [s[1].as_dict() for s in self.snakes.values()],
                 'apples': [[p.x, p.y] for p in self.board.apples]}
 
     def run_commands(self):
@@ -351,7 +352,7 @@ class SnakeJudge(Judge):
             self.run_commands()
             heads = defaultdict(list)
             removed = []
-            for slave, snake in zip(self.slaves, self.snakes):
+            for slave, snake in self.snakes.values():
                 print slave,
                 if snake.dead:
                     print 'DEAD'
@@ -393,8 +394,21 @@ class GameLoopThread(threading.Thread):
         self.judge.run()
 
 
+SCRIPT = r"""
+import sys, random
+while True:
+    for x in range(60):
+        sys.stdin.readline()
+    sys.stdout.write(random.choice(['left', 'right', 'up', 'down']))
+    sys.stdout.write('\n')
+"""
+
+
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
+    for _ in range(10):
+        judge.add_slave(SCRIPT, ''.join(random.choice(string.hexdigits) for _ in range(6)))
+
     thread = GameLoopThread(judge)
     thread.daemon = True
     thread.start()
