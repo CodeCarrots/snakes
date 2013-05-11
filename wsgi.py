@@ -62,8 +62,8 @@ def snake_name(key):
 @app.route('/leaderboard')
 def leaderboard():
     return render_template('leaderboard.html', members=[
-        {'name': snake_name(s[0]), 'score': s[1]}
-        for s in r.zrange('leaderboard', 1, -1, withscores=True)])
+        {'name': snake_name(s[0]), 'score': int(s[1])}
+        for s in r.zrevrange('leaderboard', 0, -1, withscores=True)])
 
 
 @app.route('/reload_slave', methods=['POST'])
