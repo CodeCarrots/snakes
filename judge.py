@@ -432,12 +432,22 @@ while True:
     sys.stdout.write('\n')
 """
 
+KEYS = ['E6CbCb',
+        'dbE9eE',
+        'BF02D7',
+        'FffAa4',
+        'FfeD70',
+        '90CCEd',
+        'e66211',
+        'd7abB5',
+        '07dFCe',
+        'FC1CfD']
 
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
-    for _ in range(3):
+    for key in KEYS:
         color = ('#' + ''.join(random.choice(string.hexdigits) for _ in range(3))).lower()
-        key = judge.add_slave(SCRIPT, ''.join(random.choice(string.hexdigits) for _ in range(6)), color=color)
+        judge.add_slave(SCRIPT, key, color=color)
         judge.r.set('snake:%s:color' % key, color)
 
     print judge.snakes.keys()
