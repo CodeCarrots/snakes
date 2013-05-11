@@ -18,9 +18,12 @@ def check_board():
     return r.get('snakes') or json.dumps({'snakes': [{'parts': [[1, 1], [1, 2], [2, 2]]}], 'apples': []})
 
 
-@app.route('/reload_code', methods=['POST'])
+@app.route('/reload_slave', methods=['POST'])
 def reload_code():
-    if ';' in request.form['slave_name']:
+    if (';' in request.form['slave_name']
+        or len(request.form['slave_id']) == 0
+        or len(request.form['slave_name']) == 0
+        or len(request.form['slave_code']) == 0):
         return redirect(url_for('board'))
     command = 'reload_slave;%s;%s;%s' % (request.form['slave_id'],
                                          request.form['slave_name'],
@@ -30,4 +33,4 @@ def reload_code():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)

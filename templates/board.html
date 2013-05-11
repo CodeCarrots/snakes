@@ -3,13 +3,42 @@
     <head>
 	<title>Hello from Flask</title>
 	<style>
-	    body { margin: 0; background-color: #CCC; width: 960px; font-family: Helvetica, Arial, sans-serif; font-size: 14px }
-	    canvas { background-color: #FFF; position: absolute; top: auto; bottom: auto; left: auto; right: auto; width: 800px; height: 600px }
+	    body { margin: 10px; background-color: #CCC; width: 960px; font-family: Helvetica, Arial, sans-serif; font-size: 14px }
+	    canvas { background-color: #FFF; width: 800px; height: 600px; border: 1px solid #999 }
+	    input[type=text], textarea { display: block; width: 200px; border: 1px solid #999 }
+	    textarea { width: 400px }
 </style>
 
     </head>
     <body>
 	<canvas width="800" height="600" id="canvas">{{ board }}</canvas>
 	<script type="text/javascript" src="/static/client.js"></script>
+	<form action="/reload_slave" method="POST">
+	    <label for="slave_name">Nazwa <input id="slave_name" type="text" name="slave_name" value="" /></label>
+	    <label for="slave_id">Klucz <input type="text" name="slave_id" value="" /></label>
+	    <label for="slave_code">Kod <textarea name="slave_code" rows="24" cols="80">
+import sys, random
+
+WIDTH, HEIGHT = 80, 60
+
+# Change here!
+# ------------
+# Board is a list of strings (board rows), where:
+#  - o = apple
+#  - # = snake
+#  - . = empty field
+#
+# Move should return 'left', 'right', 'up' or 'down'
+def move(board):
+    return random.choice(['left', 'right', 'up', 'down'])
+
+# Don't touch (unless you know what you're doing :-))
+while True:
+    board = [sys.stdin.readline() for _ in range(HEIGHT)]
+    sys.stdout.write(move(board))
+    sys.stdout.write('\n')
+	    </textarea></label>
+	    <input type="submit" name="Dalej!" value="Dalej!" />
+	</form>
     </body>
 </html>

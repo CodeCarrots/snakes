@@ -11,6 +11,8 @@ import sys
 import threading
 import time
 import json
+import queue
+import string
 from collections import namedtuple, deque, defaultdict
 
 import redis
@@ -176,7 +178,9 @@ class Judge(object):
     def add_slave(self, args):
         slave_name = SLAVE_USERNAME_PATTERN.format(len(self.slaves) + 1)
         create_slave_env(slave_name)
-        self.slaves.append(Slave(slave_name, args))
+        slave = Slave(slave_name, args)
+        self.slaves.append(slave)
+        return slave
 
     def run(self):
         for slave in self.slaves:
@@ -235,7 +239,7 @@ class Board(object):
 
 
 class Snake(object):
-    def __init__(self, parts=None, direction=None):
+    def __init__(self, parts=None, direction=None, name='annonymous'):
         self.parts = deque(parts) if parts is not None else deque([Point(4, 4)])
         self.direction = direction if direction is not None else 'right'
         self.ate_apple = False
@@ -267,15 +271,15 @@ class Snake(object):
         return (added, removed)
 
     def as_dict(self):
-        return {'name': '',
+        return {'name': self.name,
                 'parts': [[p.x, p.y] for p in self.parts],
-                'color': '#000',
                 'dead': self.dead}
 
 
 class SnakeJudge(Judge):
     def __init__(self, width=10, height=10):
         super(SnakeJudge, self).__init__()
+        self.commands = queue.Queue()
         self.width = width
         self.height = height
         self.board = Board(width, height)
@@ -333,10 +337,19 @@ class SnakeJudge(Judge):
         return {'snakes': [s.as_dict() for s in self.snakes],
                 'apples': [[p.x, p.y] for p in self.board.apples]}
 
+    def run_commands(self):
+        try:
+            while True:
+                command, slave_id, slave_name, slave_code = self.commands.get_nowait()
+                print command, slave_id, slave_name, slave_code
+        except queue.Empty:
+            pass
+
     def run(self):
         for slave in self.slaves:
             slave.run()
         while True:
+            self.run_commands()
             heads = defaultdict(list)
             removed = []
             for slave, snake in zip(self.slaves, self.snakes):
@@ -372,7 +385,21 @@ class SnakeJudge(Judge):
             time.sleep(1)
 
 
-# Messages:
-# reload_slave;<slave_id>;<slave_name>;<slave_code>
+class GameLoopThread(threading.Thread):
+    def __init__(self, judge):
+        self.judge = judge
 
-# {snakes: [{'color': '#ffd', 'name': 'Whatever',
+    def run(self):
+        self.judge.run()
+
+
+if __name__ == '__main__':
+    judge = SnakeJudge(80, 60)
+    thread = GameLoopThread()
+    thread.start()
+
+    while True:
+        # reload_slave;<slave_id>;<slave_name>;<slave_code>
+        message = judge.r.blpop('commands')
+        command, slave_id, slave_name, slave_code = message.split(';', 3)
+        judge.commands.put((command, slave_id, slave_name, slave_code))
