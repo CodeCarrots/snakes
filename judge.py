@@ -10,7 +10,7 @@ import subprocess
 import sys
 import threading
 import time
-import
+import json
 from collections import namedtuple, deque, defaultdict
 
 import redis
@@ -284,7 +284,8 @@ class SnakeJudge(Judge):
 
     def spawn_apple(self):
         p = self.board.random_empty_field()
-        self.board[p.x, p.y] = 'o'
+        if p is not None:
+            self.board[p.x, p.y] = 'o'
 
     def kill_snake(self, snake):
         for p in snake.parts:
@@ -319,7 +320,8 @@ class SnakeJudge(Judge):
         self.turn += 1
 
     def as_dict(self):
-        return {'snakes': [s.as_json() for s in self.snakes]}
+        return {'snakes': [s.as_json() for s in self.snakes],
+                'apples': []}
 
     def run(self):
         for slave in self.slaves:
@@ -356,6 +358,7 @@ class SnakeJudge(Judge):
             print
             print
             self.r.set('board', str(self.board))
+            self.r.set('snakes', json.dumps(self.as_dict()))
             time.sleep(1)
 
 
