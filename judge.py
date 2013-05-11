@@ -399,6 +399,9 @@ if __name__ == '__main__':
     thread.start()
     while True:
         # reload_slave;<slave_id>;<slave_name>;<slave_code>
-        message = judge.r.blpop('commands')
+        r = judge.r.blpop('commands', 5)
+        if r is None:
+            continue
+        _, message = r
         command, slave_id, slave_name, slave_code = message.split(';', 3)
         judge.commands.put((command, slave_id, slave_name, slave_code))
