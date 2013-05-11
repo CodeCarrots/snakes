@@ -50,9 +50,8 @@ def board(key=None):
 
 
 @app.route('/board')
-@app.route('/board/<key>')
-def check_board(key=None):
-    return r.get('snakes') or json.dumps({'snakes': [{'parts': [[1, 1], [1, 2], [2, 2]]}], 'apples': []})
+def check_board():
+    return r.get('snakes') or json.dumps({'snakes': []})
 
 
 @app.route('/reload_slave', methods=['POST'])
