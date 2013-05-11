@@ -357,6 +357,10 @@ class SnakeJudge(Judge):
         except Queue.Empty:
             pass
 
+    def update_leaderboard(self):
+        for key, (slave, snake) in self.snakes.items():
+            self.r.zadd('leaderboard', len(snake.parts), key)
+
     def run(self):
         for slave in self.slaves:
             slave.run()
@@ -398,6 +402,7 @@ class SnakeJudge(Judge):
             # print
             self.r.set('board', str(self.board))
             self.r.set('snakes', json.dumps(self.as_dict()))
+            self.update_leaderboard()
             time.sleep(1)
 
 
