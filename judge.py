@@ -320,7 +320,7 @@ class SnakeJudge(Judge):
         self.turn += 1
 
     def as_dict(self):
-        return {'snakes': [s.as_json() for s in self.snakes],
+        return {'snakes': [s.as_dict() for s in self.snakes],
                 'apples': []}
 
     def run(self):
