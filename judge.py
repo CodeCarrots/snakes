@@ -341,7 +341,7 @@ class SnakeJudge(Judge):
             while True:
                 command, slave_id, slave_name, slave_code = self.commands.get_nowait()
                 print command, slave_id, slave_name, slave_code
-        except queue.Empty:
+        except Queue.Empty:
             pass
 
     def run(self):
@@ -376,9 +376,9 @@ class SnakeJudge(Judge):
                 if tail != None:
                     removed.append(tail)
             self.check_collisions(heads, removed)
-            print str(self.board)
-            print
-            print
+            # print str(self.board)
+            # print
+            # print
             self.r.set('board', str(self.board))
             self.r.set('snakes', json.dumps(self.as_dict()))
             time.sleep(1)
@@ -386,6 +386,7 @@ class SnakeJudge(Judge):
 
 class GameLoopThread(threading.Thread):
     def __init__(self, judge):
+	threading.Thread.__init__(self)
         self.judge = judge
 
     def run(self):
@@ -394,9 +395,8 @@ class GameLoopThread(threading.Thread):
 
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
-    thread = GameLoopThread()
+    thread = GameLoopThread(judge)
     thread.start()
-
     while True:
         # reload_slave;<slave_id>;<slave_name>;<slave_code>
         message = judge.r.blpop('commands')
