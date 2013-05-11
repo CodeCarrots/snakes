@@ -8,13 +8,14 @@ r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 
 @app.route('/')
-def board():
-    return render_template('board.html', board=r.get('board'))
+@app.route('/snake/<key>')
+def board(key=None):
+    return render_template('board.html', board=r.get('board'), key=key)
 
 
 @app.route('/board')
-def check_board():
-    # return r.get('board')
+@app.route('/board/<key>')
+def check_board(key=None):
     return r.get('snakes') or json.dumps({'snakes': [{'parts': [[1, 1], [1, 2], [2, 2]]}], 'apples': []})
 
 
@@ -29,7 +30,7 @@ def reload_code():
                                          request.form['slave_name'],
                                          request.form['slave_code'])
     r.rpush('commands', command)
-    return redirect(url_for('board'))
+    return redirect(url_for('board', key=request.form['slave_id']))
 
 
 if __name__ == '__main__':

@@ -122,6 +122,8 @@ class Slave(object):
         os.kill(self.process.pid, signal.SIGSTOP)
 
     def kill_process(self, kill_tree=True):
+        if not hasattr(self, 'process'):
+            return
         pids = [self.process.pid]
         if kill_tree:
             pids.extend(get_process_children(self.process.pid))
@@ -143,7 +145,7 @@ class Slave(object):
             os.kill(self.process.pid, signal.SIGCONT)
             self.process.stdin.write(message)
             result = self.process.stdout.readline()
-        except OSError:
+        except OSError, IOError:
             # process has died
             return ''
         finally:
@@ -243,6 +245,7 @@ class Snake(object):
         self.direction = direction if direction is not None else 'right'
         self.ate_apple = False
         self.dead = False
+        self.name = name
 
     @property
     def head(self):
@@ -342,25 +345,35 @@ class SnakeJudge(Judge):
             while True:
                 command, slave_id, slave_name, slave_code = self.commands.get_nowait()
                 print command, slave_id, slave_name, slave_code
+                if command == 'reload_slave':
+                    slave, snake = self.snakes.get(slave_id, (None, None))
+                    if slave is not None:
+                        snake.name = slave_name
+                        slave.script = slave_code
+                        slave.kill_process()
         except Queue.Empty:
             pass
 
     def run(self):
         for slave in self.slaves:
             slave.run()
+
         while True:
             self.run_commands()
             heads = defaultdict(list)
             removed = []
-            for slave, snake in self.snakes.values():
+            for key, (slave, snake) in self.snakes.items():
+                if slave.process.poll() is not None:
+                    print 'DEAD'
+                    print 'Reviving...'
+                    self.snakes[key] = (slave, self.spawn_snake())
+                    slave.run()
+                    continue
+
                 print slave,
                 if snake.dead:
                     print 'DEAD'
                     slave.kill_process()
-                    continue
-                if slave.process.poll() is not None:
-                    print 'DEAD'
-                    snake.dead = True
                     continue
                 self.board[(snake.head.x, snake.head.y)] = 'H'
                 r = slave.send(str(self.board) + '\n', 5)
@@ -385,13 +398,18 @@ class SnakeJudge(Judge):
             time.sleep(1)
 
 
-class GameLoopThread(threading.Thread):
+class RedisCommandThread(threading.Thread):
     def __init__(self, judge):
 	threading.Thread.__init__(self)
         self.judge = judge
 
     def run(self):
-        self.judge.run()
+        time.sleep(3)
+        while True:
+            # reload_slave;<slave_id>;<slave_name>;<slave_code>
+            _, message = judge.r.blpop('commands')
+            command, slave_id, slave_name, slave_code = message.split(';', 3)
+            judge.commands.put((command, slave_id, slave_name, slave_code))
 
 
 SCRIPT = r"""
@@ -406,14 +424,13 @@ while True:
 
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
-    for _ in range(10):
+    for _ in range(3):
         judge.add_slave(SCRIPT, ''.join(random.choice(string.hexdigits) for _ in range(6)))
 
-    thread = GameLoopThread(judge)
+    print judge.snakes.keys()
+
+    thread = RedisCommandThread(judge)
     thread.daemon = True
     thread.start()
-    while True:
-        # reload_slave;<slave_id>;<slave_name>;<slave_code>
-        _, message = judge.r.blpop('commands')
-        command, slave_id, slave_name, slave_code = message.split(';', 3)
-        judge.commands.put((command, slave_id, slave_name, slave_code))
+
+    judge.run()
