@@ -14,17 +14,17 @@ def board():
 
 @app.route('/board')
 def check_board():
-    return r.get('board')
-    # return r.get('snakes') or json.dumps({'snakes': []})
+    # return r.get('board')
+    return r.get('snakes') or json.dumps({'snakes': [{'parts': [[1, 1], [1, 2], [2, 2]]}], 'apples': []})
 
 
 @app.route('/reload_code', methods=['POST'])
 def reload_code():
     if ';' in request.form['slave_name']:
         return redirect(url_for('board'))
-    command = 'reload_code;%s;%s;%s' % (request.form['slave_id'],
-                                        request.form['slave_name'],
-                                        request.form['slave_code'])
+    command = 'reload_slave;%s;%s;%s' % (request.form['slave_id'],
+                                         request.form['slave_name'],
+                                         request.form['slave_code'])
     r.rpush('commands', command)
     return redirect(url_for('board'))
 

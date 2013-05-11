@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import
 from collections import namedtuple, deque, defaultdict
 
 import redis
@@ -256,6 +257,11 @@ class Snake(object):
         self.ate_apple = False
         return (added, removed)
 
+    def as_dict(self):
+        return {'name': '',
+                'parts': [[p.x, p.y] for p in self.parts],
+                'color': '#000'}
+
 
 class SnakeJudge(Judge):
     def __init__(self, width=10, height=10):
@@ -311,6 +317,9 @@ class SnakeJudge(Judge):
         if self.turn % 5 == 0:
             self.spawn_apple()
         self.turn += 1
+
+    def as_dict(self):
+        return {'snakes': [s.as_json() for s in self.snakes]}
 
     def run(self):
         for slave in self.slaves:

@@ -2,23 +2,14 @@
 <html>
     <head>
 	<title>Hello from Flask</title>
+	<style>
+	    body { margin: 0; background-color: #CCC; width: 960px; font-family: Helvetica, Arial, sans-serif; font-size: 14px }
+	    canvas { background-color: #FFF; position: absolute; top: auto; bottom: auto; left: auto; right: auto; width: 800px; height: 600px }
+</style>
+
     </head>
     <body>
-	<pre id="board">{{ board }}</pre>
-	<script type="text/javascript">
-	    function reloadBoard() {
-      	        var xhr = new XMLHttpRequest();
-	        xhr.onreadystatechange = function() {
-	            if (xhr.readyState === 4 && xhr.status === 200) {
-	                document.getElementById('board').innerHTML = xhr.responseText;
-	            }
-	        }
-	        xhr.open('GET', '/board', true);
-	        xhr.send();
-	        setTimeout(reloadBoard, 5000);
-	    }
-
-	    reloadBoard();
-	</script>
+	<canvas width="800" height="600" id="canvas">{{ board }}</canvas>
+	<script type="text/javascript" src="/static/client.js"></script>
     </body>
 </html>
