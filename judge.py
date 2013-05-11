@@ -360,7 +360,7 @@ class SnakeJudge(Judge):
 
     def update_leaderboard(self):
         for key, (slave, snake) in self.snakes.items():
-            if self.leaderboard[key] < len(snake.parts):
+            if self.leaderboard.get(key, 0) < len(snake.parts):
                 self.leaderboard[key] = len(snake.parts)
                 self.r.zadd('leaderboard', len(snake.parts), key)
 
