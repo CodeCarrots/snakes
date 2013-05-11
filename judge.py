@@ -11,8 +11,7 @@ import sys
 import threading
 import time
 import json
-import queue
-import string
+import Queue
 from collections import namedtuple, deque, defaultdict
 
 import redis
@@ -279,7 +278,7 @@ class Snake(object):
 class SnakeJudge(Judge):
     def __init__(self, width=10, height=10):
         super(SnakeJudge, self).__init__()
-        self.commands = queue.Queue()
+        self.commands = Queue.Queue()
         self.width = width
         self.height = height
         self.board = Board(width, height)
