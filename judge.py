@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import pwd
 import random
@@ -15,12 +17,27 @@ import json
 import Queue
 from collections import namedtuple, deque, defaultdict
 import redis
+import codecs
 
 
 JAIL_ROOT = '/jail/cells'
 JAIL_ZYGOTE = '/jail/zygote'
 SLAVE_GROUP = 'slaves'
 SLAVE_USERNAME_PATTERN = 'slave{:02d}'
+
+
+def print(*args, **kwargs):
+    for arg in args:
+        try:
+            sys.stdout.write(arg.encode('utf8'))
+        except Exception:
+            try:
+                sys.stdout.write(str(arg))
+            except Exception:
+                sys.stdout.write(arg)
+    end = kwargs.get('end')
+    if end:
+        sys.stdout.write(end)
 
 
 def safe_makedirs(path, mode=0o777):
@@ -107,14 +124,14 @@ class Slave(object):
         os.setuid(uid)
 
     def run(self):
-        with file(os.path.join(self.cell, 'script.py'), 'w') as f:
+        with codecs.open(os.path.join(self.cell, 'script.py'), 'w', encoding='utf-8') as f:
             f.write(self.script)
         os.chmod(os.path.join(self.cell, 'script.py'), 0o755)
         self.process = subprocess.Popen(['./python', 'script.py'],
                                         shell=False,
                                         stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE,
-                                        stderr=sys.stderr,
+                                        stderr=sys.stdout,
                                         env={'PYTHONUSERBASE': '/nonexistent',
                                              'PYTHONUNBUFFERED': 'x'},
                                         close_fds=True,
@@ -188,7 +205,7 @@ class Judge(object):
             slave.run()
         while True:
             for slave in self.slaves:
-                print slave, slave.send('ping\n', 5)
+                print(slave, slave.send('ping\n', 5))
                 time.sleep(0.5)
 
 
@@ -309,6 +326,8 @@ class SnakeJudge(Judge):
             self.board[p.x, p.y] = 'o'
 
     def kill_snake(self, snake):
+        if snake.dead: # Can't kill dead snake
+            return
         for p in snake.parts:
             self.board[p.x, p.y] = '.'
         snake.dead = True
@@ -336,7 +355,9 @@ class SnakeJudge(Judge):
                     snake.ate_apple = True
             self.board[p.x, p.y] = '#'
 
-        if self.turn % 5 == 0:
+        if len(self.board.apples) < 10:
+            self.spawn_apple()
+        elif self.turn % 3 == 0:
             self.spawn_apple()
         self.turn += 1
 
@@ -348,7 +369,6 @@ class SnakeJudge(Judge):
         try:
             while True:
                 command, slave_id, slave_name, slave_code = self.commands.get_nowait()
-                print command, slave_id, slave_name, slave_code
                 if command == 'reload_slave':
                     slave, snake = self.snakes.get(slave_id, (None, None))
                     if slave is not None:
@@ -373,25 +393,28 @@ class SnakeJudge(Judge):
             heads = defaultdict(list)
             removed = []
             for key, (slave, snake) in self.snakes.items():
+                print(key[:3], slave, end=' ')
+
                 if slave.process.poll() is not None:
-                    print 'DEAD'
-                    print 'Reviving...'
+                    print('DEAD')
+                    print('Reviving...')
+                    self.kill_snake(snake)
                     self.snakes[key] = (slave, self.spawn_snake(snake.color))
                     slave.run()
                     continue
 
-                print slave,
                 if snake.dead:
-                    print 'DEAD'
+                    print('DEAD')
                     slave.kill_process()
                     continue
+
                 self.board[(snake.head.x, snake.head.y)] = 'H'
                 r = slave.send(str(self.board) + '\n', 5)
                 self.board[(snake.head.x, snake.head.y)] = '#'
-                print r
+                print(r)
                 if r[:-1] not in ('left', 'right', 'up', 'down'):
                     slave.kill_process()
-                    snake.dead = True
+                    self.kill_snake(snake)
                     continue
                 snake.direction = r[:-1]
                 head, tail = snake.move()
@@ -400,9 +423,7 @@ class SnakeJudge(Judge):
                 if tail != None:
                     removed.append(tail)
             self.check_collisions(heads, removed)
-            # print str(self.board)
-            # print
-            # print
+            # print(str(self.board))
             self.r.set('board', str(self.board))
             self.r.set('snakes', json.dumps(self.as_dict()))
             self.update_leaderboard()
@@ -433,25 +454,52 @@ while True:
     sys.stdout.write('\n')
 """
 
-KEYS = ['E6CbCb',
-        'dbE9eE',
-        'BF02D7',
-        'FffAa4',
-        'FfeD70',
-        '90CCEd',
-        'e66211',
-        'd7abB5',
-        '07dFCe',
-        'FC1CfD']
+KEYS = ['2a8404',
+ 'dD4bd5',
+ '8FC95A',
+ 'ec50e2',
+ 'cF9A0a',
+ 'BAe2A3',
+ '034445',
+ '9aC5c0',
+ '2aaD8c',
+ 'F46Dd2',
+ 'fB41d9',
+ '460366',
+ 'E7ecBB',
+ '5fDCBa',
+ 'BB9ac3',
+ '2BbFEA',
+ '7cA7DF',
+ 'cf9AbA',
+ 'bf03b5',
+ 'A9B240',
+ 'DE91Db',
+ '14F8Ea',
+ 'f01E5B',
+ '41CD3b',
+ 'AE5C1f',
+ '3fed1E',
+ 'edBf8C',
+ 'A9411f',
+ 'DCD660',
+ 'dDb7B9',
+ 'fd6FAA',
+ 'c2a8Dd',
+ 'E6EFed',
+ 'B3459E',
+ 'eCaFAF']
 
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
     for key in KEYS:
         color = ('#' + ''.join(random.choice(string.hexdigits) for _ in range(3))).lower()
-        judge.add_slave(SCRIPT, key, color=color)
+        script = judge.r.get('snake:%s:code' % key)
+        judge.add_slave(script.decode('utf-8') if script is not None
+                                      else SCRIPT, key, color=color)
         judge.r.set('snake:%s:color' % key, color)
 
-    print judge.snakes.keys()
+    print(judge.snakes.keys())
 
     thread = RedisCommandThread(judge)
     thread.daemon = True
