@@ -21,8 +21,37 @@ WIDTH, HEIGHT = 80, 60
 #  - . = empty field
 #
 # Move should return 'left', 'right', 'up' or 'down'
+
+def find_head(board):
+    for i, row in enumerate(board):
+        for j, letter in enumerate(row):
+            if letter == 'H':
+                return j, i
+
 def move(board):
-    return random.choice(['left', 'right', 'up', 'down'])
+    head = find_head(board)
+    goto = random.choice(['left', 'right', 'up', 'down'])
+    choices = [
+            ('left', -1, 0),
+            ('right', 1, 0),
+            ('up', 0, -1),
+            ('down', 0, 1),
+        ]
+    random.shuffle(choices)
+    for (direction, dx, dy) in choices:
+        new_head = (head[0]+dx, head[1]+dy)
+        if new_head[0] < 0:
+            continue
+        if new_head[1] < 0:
+            continue
+        if new_head[0] > WIDTH - 1:
+            continue
+        if new_head[1] > HEIGHT - 1:
+            continue
+        if board[new_head[1]][new_head[0]] == '#':
+            continue
+        goto = direction
+    return goto
 
 # Don't touch (unless you know what you're doing :-))
 while True:
@@ -58,7 +87,7 @@ def tail( f, window=20 ):
 
 @app.route('/log')
 def log():
-    return Response(tail(file('/srv/webapps/snakes/log/judge.log'), 1000), mimetype='text/plain')
+    return Response(tail(file('judge_out'), 2000), mimetype='text/plain')
 
 
 @app.route('/')
@@ -67,17 +96,20 @@ def board(key=None):
     snake_name = 'Annonymous'
     snake_code = SCRIPT
     snake_color = '#fff'
+    snake_err = ''
 
     if key is not None:
         snake_name = (r.get('snake:%s:name' % key) or '').decode('utf-8')
         snake_code = (r.get('snake:%s:code' % key) or SCRIPT).decode('utf-8')
         snake_color = (r.get('snake:%s:color' % key) or '#fff').decode('utf-8')
+        snake_err = (r.get('snake:%s:err' % key) or '').decode('utf-8')
     return render_template('board.html',
                            board=r.get('board'),
                            key=key or '',
                            name=snake_name,
                            code=snake_code,
-                           color=snake_color)
+                           color=snake_color,
+                           err=snake_err)
 
 
 @app.route('/board')
@@ -124,4 +156,4 @@ def reload_code():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0')

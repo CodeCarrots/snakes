@@ -17,7 +17,12 @@
 	<form action="/reload_slave" method="POST">
 	    <label for="slave_name">Nazwa <input id="slave_name" type="text" name="slave_name" value="{{ name }}" /></label>
 	    <label for="slave_id">Klucz <input type="text" name="slave_id" value="{{ key }}" /></label>
-	    <label for="slave_code">Kod <textarea name="slave_code" rows="24" cols="80">{{ code }}</textarea></label>
+	    <label for="slave_code">Kod 
+<textarea name="slave_code" rows="24" cols="80">{{ code }}</textarea>
+</label>
+<pre>
+{{ err}}
+</pre>
 	    <input type="submit" name="Dalej!" value="Dalej!" />
 	</form>
 	<script type="text/javascript">

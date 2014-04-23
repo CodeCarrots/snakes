@@ -14,6 +14,7 @@ import string
 import threading
 import time
 import json
+import fcntl
 import Queue
 from collections import namedtuple, deque, defaultdict
 import redis
@@ -82,7 +83,10 @@ def create_slave_env(name):
 
     # Copy chroot zygote to users home and change permissions
     safe_makedirs(JAIL_ROOT, mode=0o755)
-    shutil.copytree(JAIL_ZYGOTE, cell)
+    try:
+        shutil.copytree(JAIL_ZYGOTE, cell)
+    except OSError:
+        pass
 
     os.chmod(cell , 0o755)
     for root, dirs, files in os.walk(cell):
@@ -93,8 +97,11 @@ def create_slave_env(name):
 
     # Create random and urandom devices
     safe_makedirs(os.path.join(cell, 'dev'), 0o755)
-    os.mknod(os.path.join(cell, 'dev', 'random'), 0o644 | stat.S_IFCHR, os.makedev(1, 8))
-    os.mknod(os.path.join(cell, 'dev', 'urandom'), 0o644 | stat.S_IFCHR, os.makedev(1, 9))
+    try:
+        os.mknod(os.path.join(cell, 'dev', 'random'), 0o644 | stat.S_IFCHR, os.makedev(1, 8))
+        os.mknod(os.path.join(cell, 'dev', 'urandom'), 0o644 | stat.S_IFCHR, os.makedev(1, 9))
+    except OSError:
+        pass
 
 
 def get_process_children(pid):
@@ -110,6 +117,7 @@ class Slave(object):
         self.script = script
         self.cell = os.path.join(JAIL_ROOT, self.env)
         self.stderr = StringIO.StringIO()
+        self.last_err = None
 
     def instrument_process(self):
         uid = pwd.getpwnam(self.env).pw_uid
@@ -118,7 +126,7 @@ class Slave(object):
 
         resource.setrlimit(resource.RLIMIT_DATA, (32 * 1024 * 1024, 32 * 1024 * 1024))
         resource.setrlimit(resource.RLIMIT_STACK, (8 * 1024 * 1024, 8 * 1024 * 1024))
-        resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
+        # resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
         os.nice(15)
 
         os.setuid(uid)
@@ -131,14 +139,16 @@ class Slave(object):
                                         shell=False,
                                         stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE,
-                                        stderr=sys.stdout,
+                                        stderr=subprocess.PIPE,
                                         env={'PYTHONUSERBASE': '/nonexistent',
                                              'PYTHONUNBUFFERED': 'x'},
                                         close_fds=True,
                                         preexec_fn=self.instrument_process)
+        fcntl.fcntl(self.process.stderr.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
         os.kill(self.process.pid, signal.SIGSTOP)
 
     def kill_process(self, kill_tree=True):
+        self.last_err = None
         if not hasattr(self, 'process'):
             return
         pids = [self.process.pid]
@@ -168,6 +178,14 @@ class Slave(object):
         finally:
             # process might have died before getting to this line
             # so wrap to avoid OSError: no such process
+            err = ''
+            try:
+                err = self.process.stderr.read()
+            except IOError:
+                pass
+            if err:
+                #print("error  message:", err)
+                self.last_err = err
             try:
                 os.kill(self.process.pid, signal.SIGSTOP)
             except OSError:
@@ -375,6 +393,8 @@ class SnakeJudge(Judge):
                         snake.name = slave_name
                         slave.script = slave_code
                         slave.kill_process()
+                        self.r.set('snake:%s:err' % (slave_id,), '')
+                        print("Cleared error for:", slave_id[:3])
         except Queue.Empty:
             pass
 
@@ -393,6 +413,7 @@ class SnakeJudge(Judge):
             heads = defaultdict(list)
             removed = []
             for key, (slave, snake) in self.snakes.items():
+                print("\n")
                 print(key[:3], slave, end=' ')
 
                 if slave.process.poll() is not None:
@@ -412,16 +433,23 @@ class SnakeJudge(Judge):
                 r = slave.send(str(self.board) + '\n', 5)
                 self.board[(snake.head.x, snake.head.y)] = '#'
                 print(r)
+                err = slave.last_err or ''
                 if r[:-1] not in ('left', 'right', 'up', 'down'):
                     slave.kill_process()
                     self.kill_snake(snake)
+                    if r:
+                        err += 'Received invalid command "%s"' % (r,)
+                    self.r.set('snake:%s:err' % (key,), err.encode('utf-8'))
                     continue
+                if err:
+                    self.r.set('snake:%s:err' % (key,), err.encode('utf-8'))
                 snake.direction = r[:-1]
                 head, tail = snake.move()
                 if head != None:
                     heads[head].append(snake)
                 if tail != None:
                     removed.append(tail)
+                #self.r.set('snake:%s:err' % (key,), '')
             self.check_collisions(heads, removed)
             # print(str(self.board))
             self.r.set('board', str(self.board))
@@ -454,41 +482,10 @@ while True:
     sys.stdout.write('\n')
 """
 
-KEYS = ['2a8404',
- 'dD4bd5',
- '8FC95A',
- 'ec50e2',
- 'cF9A0a',
- 'BAe2A3',
- '034445',
- '9aC5c0',
- '2aaD8c',
- 'F46Dd2',
- 'fB41d9',
- '460366',
- 'E7ecBB',
- '5fDCBa',
- 'BB9ac3',
- '2BbFEA',
- '7cA7DF',
- 'cf9AbA',
- 'bf03b5',
- 'A9B240',
- 'DE91Db',
- '14F8Ea',
- 'f01E5B',
- '41CD3b',
- 'AE5C1f',
- '3fed1E',
- 'edBf8C',
- 'A9411f',
- 'DCD660',
- 'dDb7B9',
- 'fd6FAA',
- 'c2a8Dd',
- 'E6EFed',
- 'B3459E',
- 'eCaFAF']
+with open('keys', 'r') as keys_file:
+    KEYS = keys_file.read().split("\n")
+KEYS = [x.strip() for x in KEYS]
+KEYS = [x for x in KEYS if x]
 
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
