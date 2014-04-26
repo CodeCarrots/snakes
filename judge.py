@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import colorsys
 import os
 import pwd
 import random
@@ -117,7 +118,7 @@ class Slave(object):
         self.script = script
         self.cell = os.path.join(JAIL_ROOT, self.env)
         self.stderr = StringIO.StringIO()
-        self.last_err = None
+        self.last_err = ''
 
     def instrument_process(self):
         uid = pwd.getpwnam(self.env).pw_uid
@@ -148,7 +149,7 @@ class Slave(object):
         os.kill(self.process.pid, signal.SIGSTOP)
 
     def kill_process(self, kill_tree=True):
-        self.last_err = None
+        self.last_err = ''
         if not hasattr(self, 'process'):
             return
         pids = [self.process.pid]
@@ -394,7 +395,6 @@ class SnakeJudge(Judge):
                         slave.script = slave_code
                         slave.kill_process()
                         self.r.set('snake:%s:err' % (slave_id,), '')
-                        print("Cleared error for:", slave_id[:3])
         except Queue.Empty:
             pass
 
@@ -433,23 +433,28 @@ class SnakeJudge(Judge):
                 r = slave.send(str(self.board) + '\n', 5)
                 self.board[(snake.head.x, snake.head.y)] = '#'
                 print(r)
-                err = slave.last_err or ''
+                err = slave.last_err
                 if r[:-1] not in ('left', 'right', 'up', 'down'):
                     slave.kill_process()
                     self.kill_snake(snake)
                     if r:
-                        err += 'Received invalid command "%s"' % (r,)
-                    self.r.set('snake:%s:err' % (key,), err.encode('utf-8'))
+                        err += 'Received invalid command "%s"\n' % (r,)
+
+                previous_errors = self.r.get('snake:%s:err' % (key,)).decode('utf-8') + err
+                previous_errors = previous_errors.split('\n')[-100:]
+                errors = u"\n".join(previous_errors)
+                self.r.set('snake:%s:err' % (key,), errors.encode('utf-8'))
+
+                if r[:-1] not in ('left', 'right', 'up', 'down'):
                     continue
-                if err:
-                    self.r.set('snake:%s:err' % (key,), err.encode('utf-8'))
+
                 snake.direction = r[:-1]
                 head, tail = snake.move()
-                if head != None:
+                if head is not None:
                     heads[head].append(snake)
-                if tail != None:
+                if tail is not None:
                     removed.append(tail)
-                #self.r.set('snake:%s:err' % (key,), '')
+
             self.check_collisions(heads, removed)
             # print(str(self.board))
             self.r.set('board', str(self.board))
@@ -460,7 +465,7 @@ class SnakeJudge(Judge):
 
 class RedisCommandThread(threading.Thread):
     def __init__(self, judge):
-	threading.Thread.__init__(self)
+        threading.Thread.__init__(self)
         self.judge = judge
 
     def run(self):
@@ -489,12 +494,20 @@ KEYS = [x for x in KEYS if x]
 
 if __name__ == '__main__':
     judge = SnakeJudge(80, 60)
+    random.seed()
     for key in KEYS:
-        color = ('#' + ''.join(random.choice(string.hexdigits) for _ in range(3))).lower()
-        script = judge.r.get('snake:%s:code' % key)
-        judge.add_slave(script.decode('utf-8') if script is not None
-                                      else SCRIPT, key, color=color)
+        color = judge.r.get('snake:%s:color' % key)
+        if color is None:
+            h = random.random()
+            s = 1
+            v = 0.8
+            r, g, b = colorsys.hsv_to_rgb(h, s, v)
+            color = ('#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))).lower()
         judge.r.set('snake:%s:color' % key, color)
+        script = judge.r.get('snake:%s:code' % key)
+        judge.add_slave(
+            script.decode('utf-8') if script is not None
+            else SCRIPT, key, color=color)
 
     print(judge.snakes.keys())
 

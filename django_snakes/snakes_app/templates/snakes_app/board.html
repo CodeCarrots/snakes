@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+    <title>Snakes!</title>
+    <link rel="stylesheet" href="/static/snakes_app/st.css"/>
+</head>
+<body>
+<div id="leaderboard"></div>
+<canvas width="800" height="600" id="canvas">{{ board }}</canvas>
+<form action="/snakes_app/reload/" method="POST">
+    {% csrf_token %}
+    <label for="slave_name">
+        Nazwa
+        <input id="slave_name" type="text" name="slave_name" value="{{ name }}"/>
+    </label>
+    <label for="slave_id">
+        Klucz
+        <input type="text" name="slave_id" value="{{ key }}"/>
+    </label>
+    <label for="slave_code">
+        Kod
+        <textarea name="slave_code" rows="24" cols="80">{{ code }}</textarea>
+    </label>
+<pre id="error_log">
+{#{{ err }}#}
+</pre>
+    <input type="submit" name="Dalej!" value="Dalej!"/>
+</form>
+
+<script type="text/javascript">
+    {% if key %}
+    var KEY = "{{ key }}";
+    {% else %}
+    var KEY = null;
+    {% endif %}
+</script>
+
+<script type="text/javascript" src="/static/snakes_app/jquery-2.1.0.min.js"></script>
+<script type="text/javascript" src="/static/snakes_app/client.js"></script>
+
+</body>
+</html>
