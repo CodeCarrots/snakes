@@ -84,8 +84,18 @@ def get_snake_name(key):
         return u'Annonymous'
 
 
+def get_snake_color(key):
+    name = r.get('snake:%s:color' % key)
+    return 'black' if name is None else name
+
+
 def leaderboard(request):
-    members = [{'name': get_snake_name(s[0]), 'score': int(s[1])}
+    members = [
+        {
+           'name': get_snake_name(s[0]),
+           'score': int(s[1]),
+           'color': get_snake_color(s[0])
+        }
         for s in r.zrevrange('leaderboard', 0, -1, withscores=True)]
     return render(request, 'snakes_app/leaderboard.html', dict(members=members))
 

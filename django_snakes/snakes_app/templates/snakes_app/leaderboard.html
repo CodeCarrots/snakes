@@ -1,6 +1,8 @@
 <h3>Wyniki</h3>
 <ol>
 {% for member in members %}
-<li><b>{{ member.score }}</b> {{ member.name }}</li>
+<li>
+    <b>{{ member.score }}</b>
+    <span style="color: {{ member.color }}">{{ member.name }}</span></li>
 {% endfor %}
 </ol>
