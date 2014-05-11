@@ -16,13 +16,8 @@ def json_response(view):
     return json_view
 
 
-with open('snakes_app/example.py') as plik:
-    SCRIPT = plik.read()
-
-
 def board(request):
     snake_name = 'Annonymous'
-    snake_code = SCRIPT
     snake_color = '#fff'
     snake_err = ''
 
@@ -31,21 +26,22 @@ def board(request):
         'snakes_app/board.html',
         {
             'board': r.get('board'),
-            'key': None,
-            'name': snake_name,
-            'code': snake_code,
-            'color': snake_color,
-            'err': snake_err
+            'key': None
         })
+
+
+SCRIPT = ''
+
+with open('../example.py') as plik:
+    SCRIPT = plik.read()
 
 
 def key_board(request, key):
     snake_name = r.get('snake:%s:name' % key)
-    snake_code = SCRIPT
     snake_color = '#fff'
     snake_err = ''
     if snake_name is None:
-        invalid_key = True
+        return redirect('/snakes_app/')
     else:
         invalid_key = False
         snake_name = snake_name.decode('utf-8')
@@ -70,10 +66,16 @@ def key_board(request, key):
 @json_response
 def check_board(request):
     snakes = r.get('snakes')
-    if snakes is not None:
-        return json.loads(snakes.decode('utf-8'))
-    else:
+    key = request.GET.get('KEY')
+    snakes =  json.loads(snakes.decode('utf-8'))
+    if snakes is None:
         return {'snakes': []}
+
+    for snake in snakes['snakes']:
+        snake['current'] = snake['key'] == key
+        del snake['key']
+        
+    return snakes
 
 
 def get_snake_name(key):

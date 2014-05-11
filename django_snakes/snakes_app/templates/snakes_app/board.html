@@ -3,10 +3,14 @@
 <head>
     <title>Snakes!</title>
     <link rel="stylesheet" href="/static/snakes_app/st.css"/>
+<script type="text/javascript" src="/static/snakes_app/jquery-2.1.0.min.js"></script>
+<script type="text/javascript" src="/static/ace/ace.js" charset="utf-8"></script>
+<script type="text/javascript" src="/static/snakes_app/client.js"></script>
 </head>
 <body>
 <div id="leaderboard"></div>
 <canvas width="800" height="600" id="canvas">{{ board }}</canvas>
+{% if key %}
 <form action="/snakes_app/reload/" method="POST">
     {% csrf_token %}
     <label for="slave_name">
@@ -20,13 +24,14 @@
     <label for="slave_code">
         Kod
         <textarea name="slave_code" rows="24" cols="80">{{ code }}</textarea>
+        <div id="editor">test</div>
     </label>
 <pre id="error_log">
 
 </pre>
     <input type="submit" name="Dalej!" value="Dalej!"/>
 </form>
-
+{% endif %}
 <script type="text/javascript">
     {% if key %}
     var KEY = "{{ key }}";
@@ -35,8 +40,26 @@
     {% endif %}
 </script>
 
-<script type="text/javascript" src="/static/snakes_app/jquery-2.1.0.min.js"></script>
-<script type="text/javascript" src="/static/snakes_app/client.js"></script>
+<script>
+$(function(){
+{% if key %}
+    console.log("setup editor");
+    var editor = ace.edit("editor");
+    editor.setTheme("ace/theme/monokai");
+    editor.getSession().setMode("ace/mode/python");
+
+var textarea = $('textarea[name="slave_code"]');
+textarea.hide();
+editor.getSession().setValue(textarea.val());
+console.log(textarea.val());
+editor.getSession().on('change', function(){
+  textarea.val(editor.getSession().getValue());
+});
+{% endif %}
+start_client();
+
+});
+</script>
 
 </body>
 </html>

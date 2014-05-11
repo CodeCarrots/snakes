@@ -1,3 +1,4 @@
+var start_client = function start_client(){
 var WIDTH = 80;
 var HEIGHT = 60;
 
@@ -19,14 +20,13 @@ function reloadBoard() {
     };
 
     $.ajax({
-        url: '/snakes_app/board/',
+        url: '/snakes_app/board/?KEY=' + KEY,
         success: reload_success,
         error: reload_error,
         dataType: 'json'
     });
 }
 
-reloadBoard();
 
 
 function reloadLeaderboard() {
@@ -45,7 +45,6 @@ function reloadLeaderboard() {
         error: leader_error
     });
 }
-reloadLeaderboard();
 
 
 function reloadErrors() {
@@ -67,7 +66,6 @@ function reloadErrors() {
         error: errors_error
     });
 }
-reloadErrors();
 
 
 function render() {
@@ -76,6 +74,11 @@ function render() {
     for (i = 0; i < board.snakes.length; i++) {
         snake = board.snakes[i];
         c.fillStyle = snake.color;
+        if(snake.current){
+            c.strokeStyle = 'black';
+        }else{
+            c.strokeStyle = 'white';
+        }
 
         if (snake.dead) {
             continue;
@@ -84,7 +87,19 @@ function render() {
         for (j = 0; j < snake.parts.length; j++) {
             part = snake.parts[j];
             c.fillRect(part[0] * 10, part[1] * 10, 9, 9);
+            c.strokeRect(part[0] * 10, part[1] * 10, 9, 9);
         }
+        part = snake.parts[snake.parts.length-1];
+        c.fillStyle = '#000000';
+        c.beginPath();
+        c.arc(part[0] * 10 + 3, part[1] * 10 + 3, 1, 0, Math.PI*2);
+        c.fill();
+        c.beginPath();
+        c.arc(part[0] * 10 + 7, part[1] * 10 + 3, 1, 0, Math.PI*2);
+        c.fill();
+        c.beginPath();
+        c.arc(part[0] * 10 + 5, part[1] * 10 + 5, 3, Math.PI*0.2, Math.PI*(0.8));
+        c.fill();
     }
     c.fillStyle = '#FF0000';
     for (i = 0; i < board.apples.length; i++) {
@@ -92,12 +107,16 @@ function render() {
         c.beginPath();
         c.arc(apple[0] * 10 + 5, apple[1] * 10 + 5, 4, 0, Math.PI*2);
         c.fill();
-//        c.fillRect(apple[0] * 10, apple[1] * 10, 10, 10);
     }
 }
 
-var requestAnimFrame = window.requestAnimationFrame || mozRequestAnimationFrame;
-(function animloop() {
-    requestAnimFrame(animloop);
-    render();
-}());
+	reloadBoard();
+	reloadLeaderboard();
+	reloadErrors();
+	var requestAnimFrame = window.requestAnimationFrame || mozRequestAnimationFrame;
+	(function animloop() {
+	    requestAnimFrame(animloop);
+	    render();
+	}());
+
+};
