@@ -20,6 +20,7 @@ import Queue
 from collections import namedtuple, deque, defaultdict
 import redis
 import codecs
+from datetime import datetime
 
 
 JAIL_ROOT = '/jail/cells'
@@ -72,6 +73,16 @@ def create_slave_group():
 def create_slave_env(name):
     cell = os.path.join(JAIL_ROOT, name)
 
+    safe_makedirs(JAIL_ROOT, mode=0o755)
+    # Copy chroot zygote to users home and change permissions
+    try:
+        shutil.copytree(JAIL_ZYGOTE, cell)
+    except OSError:
+        pass
+    except Exception as e:
+        print(e)
+        import pdb; pdb.set_trace()
+        raise
     # Create user
     subprocess.check_call(['/usr/sbin/adduser',
                            '--system',
@@ -82,14 +93,9 @@ def create_slave_env(name):
                            '--disabled-password',
                            name])
 
-    # Copy chroot zygote to users home and change permissions
-    safe_makedirs(JAIL_ROOT, mode=0o755)
-    try:
-        shutil.copytree(JAIL_ZYGOTE, cell)
-    except OSError:
-        pass
 
     os.chmod(cell , 0o755)
+    print("chmod", cell)
     for root, dirs, files in os.walk(cell):
         for d in dirs:
             os.chmod(os.path.join(root, d), 0o755)
@@ -98,11 +104,13 @@ def create_slave_env(name):
 
     # Create random and urandom devices
     safe_makedirs(os.path.join(cell, 'dev'), 0o755)
+    print("mkdir dev", cell)
     try:
         os.mknod(os.path.join(cell, 'dev', 'random'), 0o644 | stat.S_IFCHR, os.makedev(1, 8))
         os.mknod(os.path.join(cell, 'dev', 'urandom'), 0o644 | stat.S_IFCHR, os.makedev(1, 9))
     except OSError:
         pass
+    print("slave env created", cell)
 
 
 def get_process_children(pid):
@@ -136,6 +144,7 @@ class Slave(object):
         with codecs.open(os.path.join(self.cell, 'script.py'), 'w', encoding='utf-8') as f:
             f.write(self.script)
         os.chmod(os.path.join(self.cell, 'script.py'), 0o755)
+        print("running %s\n" % (self.cell))
         self.process = subprocess.Popen(['./python', 'script.py'],
                                         shell=False,
                                         stdin=subprocess.PIPE,
@@ -276,13 +285,14 @@ class Board(object):
 
 
 class Snake(object):
-    def __init__(self, parts=None, direction=None, color=None, name='annonymous'):
+    def __init__(self, parts=None, direction=None, color=None, name='annonymous', key=None):
         self.parts = deque(parts) if parts is not None else deque([Point(4, 4)])
         self.direction = direction if direction is not None else 'right'
         self.ate_apple = False
         self.dead = False
         self.name = name
         self.color = color
+        self.key = key
 
     @property
     def head(self):
@@ -313,6 +323,7 @@ class Snake(object):
         return {'name': self.name,
                 'parts': [[p.x, p.y] for p in self.parts],
                 'dead': self.dead,
+                'key': self.key,
                 'color': self.color}
 
 
@@ -330,14 +341,14 @@ class SnakeJudge(Judge):
 
     def add_slave(self, args, key, color):
         slave = super(SnakeJudge, self).add_slave(args)
-        snake = self.spawn_snake(color)
+        snake = self.spawn_snake(color, key=key)
         self.snakes[key] = (slave, snake)
         return key
 
-    def spawn_snake(self, color):
+    def spawn_snake(self, color, key):
         p = self.board.random_empty_field()
         self.board[p.x, p.y] = '#'
-        return Snake([p], color=color)
+        return Snake([p], color=color, key=key)
 
     def spawn_apple(self):
         p = self.board.random_empty_field()
@@ -420,7 +431,7 @@ class SnakeJudge(Judge):
                     print('DEAD')
                     print('Reviving...')
                     self.kill_snake(snake)
-                    self.snakes[key] = (slave, self.spawn_snake(snake.color))
+                    self.snakes[key] = (slave, self.spawn_snake(snake.color, key=key))
                     slave.run()
                     continue
 
@@ -439,8 +450,12 @@ class SnakeJudge(Judge):
                     self.kill_snake(snake)
                     if r:
                         err += 'Received invalid command "%s"\n' % (r,)
-
-                previous_errors = self.r.get('snake:%s:err' % (key,)).decode('utf-8') + err
+                
+                if err:
+                    now = datetime.today()
+                    err = str(now) + "\n" + err
+                previous_errors = self.r.get('snake:%s:err' % (key,)) or ''
+                previous_errors = previous_errors.decode('utf-8') + err
                 previous_errors = previous_errors.split('\n')[-100:]
                 errors = u"\n".join(previous_errors)
                 self.r.set('snake:%s:err' % (key,), errors.encode('utf-8'))
@@ -505,6 +520,9 @@ if __name__ == '__main__':
             color = ('#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))).lower()
         judge.r.set('snake:%s:color' % key, color)
         script = judge.r.get('snake:%s:code' % key)
+        name = judge.r.get('snake:%s:name' % key)
+        if name is None:
+            judge.r.set('snake:%s:name' % key, u'Anonymous')
         judge.add_slave(
             script.decode('utf-8') if script is not None
             else SCRIPT, key, color=color)
