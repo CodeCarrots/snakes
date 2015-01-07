@@ -12,7 +12,7 @@ def snake_name(code):
         return u'Anonymous'
 
 def players_func(args):
-    codes =  r.zrange('leaderboard', 0, -1, withscores=True)
+    codes = r.zrange('leaderboard', 0, -1, withscores=True)
     for (code, score) in codes:
         parts = []
         if args.url:

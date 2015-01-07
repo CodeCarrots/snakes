@@ -5,13 +5,10 @@ import os
 import pwd
 import random
 import resource
-import shutil
 import signal
 import stat
 import StringIO
 import subprocess
-import sys
-import string
 import threading
 import time
 import json
@@ -20,7 +17,6 @@ import Queue
 from collections import namedtuple, deque, defaultdict
 import redis
 import codecs
-from datetime import datetime
 
 
 JAIL_ROOT = '/jail/cells'
@@ -28,26 +24,26 @@ JAIL_ZYGOTE = '/jail/zygote'
 SLAVE_GROUP = 'slaves'
 SLAVE_USERNAME_PATTERN = 'slave{:02d}'
 
-
-def print(*args, **kwargs):
-    for arg in args:
-        try:
-            sys.stdout.write(arg.encode('utf8'))
-        except Exception:
-            try:
-                sys.stdout.write(str(arg))
-            except Exception:
-                sys.stdout.write(arg)
-    end = kwargs.get('end')
-    if end:
-        sys.stdout.write(end)
+#
+# def print(*args, **kwargs):
+#     for arg in args:
+#         try:
+#             sys.stdout.write(arg.encode('utf8'))
+#         except Exception:
+#             try:
+#                 sys.stdout.write(str(arg))
+#             except Exception:
+#                 sys.stdout.write(arg)
+#     end = kwargs.get('end')
+#     if end:
+#         sys.stdout.write(end)
 
 
 def safe_makedirs(path, mode=0o777):
     try:
         os.makedirs(path, mode)
     except OSError as e:
-        if e.errno != 17: # 17 == directory already exists
+        if e.errno != 17:  # 17 == directory already exists
             raise
 
 
@@ -58,31 +54,54 @@ def create_slave_group():
     except subprocess.CalledProcessError as e:
         if e.returncode != 1: # group already exists?
             raise
-    if subprocess.call(['iptables',
-                        '-C', 'OUTPUT',
-                        '-m', 'owner',
-                        '--gid-owner', SLAVE_GROUP,
-                        '-j', 'DROP']) != 0:
-        subprocess.check_call(['iptables',
-                               '-A', 'OUTPUT',
-                               '-m', 'owner',
-                               '--gid-owner', SLAVE_GROUP,
-                               '-j', 'DROP'])
+    # if subprocess.call(['iptables',
+    #                     '-C', 'OUTPUT',
+    #                     '-m', 'owner',
+    #                     '--gid-owner', SLAVE_GROUP,
+    #                     '-j', 'DROP']) != 0:
+    #     subprocess.check_call(['iptables',
+    #                            '-A', 'OUTPUT',
+    #                            '-m', 'owner',
+    #                            '--gid-owner', SLAVE_GROUP,
+    #                            '-j', 'DROP'])
 
 
 def create_slave_env(name):
     cell = os.path.join(JAIL_ROOT, name)
+    if os.path.exists(cell):
+        return
 
     safe_makedirs(JAIL_ROOT, mode=0o755)
-    # Copy chroot zygote to users home and change permissions
-    try:
-        shutil.copytree(JAIL_ZYGOTE, cell)
-    except OSError:
-        pass
-    except Exception as e:
-        print(e)
-        import pdb; pdb.set_trace()
-        raise
+    safe_makedirs(cell)
+    safe_makedirs(os.path.join(cell, 'bin'))
+    safe_makedirs(os.path.join(cell, 'lib'))
+    safe_makedirs(os.path.join(cell, 'lib64'))
+    safe_makedirs(os.path.join(cell, 'usr'))
+    subprocess.check_call([
+        'ln',
+        os.path.join(JAIL_ZYGOTE, 'python'),
+        os.path.join(cell, 'python')
+    ])
+    subprocess.check_call([
+        'mount', '--bind',
+        os.path.join(JAIL_ZYGOTE, 'bin'),
+        os.path.join(cell, 'bin')
+    ])
+    subprocess.check_call([
+        'mount', '--bind',
+        os.path.join(JAIL_ZYGOTE, 'lib'),
+        os.path.join(cell, 'lib')
+    ])
+    subprocess.check_call([
+        'mount', '--bind',
+        os.path.join(JAIL_ZYGOTE, 'lib64'),
+        os.path.join(cell, 'lib64')
+    ])
+    subprocess.check_call([
+        'mount', '--bind',
+        os.path.join(JAIL_ZYGOTE, 'usr'),
+        os.path.join(cell, 'usr')
+    ])
     # Create user
     subprocess.check_call(['/usr/sbin/adduser',
                            '--system',
@@ -93,8 +112,7 @@ def create_slave_env(name):
                            '--disabled-password',
                            name])
 
-
-    os.chmod(cell , 0o755)
+    os.chmod(cell, 0o755)
     print("chmod", cell)
     for root, dirs, files in os.walk(cell):
         for d in dirs:
@@ -144,7 +162,7 @@ class Slave(object):
         with codecs.open(os.path.join(self.cell, 'script.py'), 'w', encoding='utf-8') as f:
             f.write(self.script)
         os.chmod(os.path.join(self.cell, 'script.py'), 0o755)
-        print("running %s\n" % (self.cell))
+        print("running %s\n" % (self.cell,))
         self.process = subprocess.Popen(['./python', 'script.py'],
                                         shell=False,
                                         stdin=subprocess.PIPE,
@@ -174,28 +192,33 @@ class Slave(object):
 
     def send(self, message, timeout=0):
         """Sends a message to the slave and returns response."""
+        timer = None
         if timeout > 0:
             timer = threading.Timer(timeout, self.kill_process)
             timer.start()
-
+        result = ''
+        err = ''
         try:
-            os.kill(self.process.pid, signal.SIGCONT)
-            self.process.stdin.write(message)
-            result = self.process.stdout.readline()
-        except (OSError, IOError):
-            # process has died
-            return ''
-        finally:
-            # process might have died before getting to this line
-            # so wrap to avoid OSError: no such process
-            err = ''
             try:
+                os.kill(self.process.pid, signal.SIGCONT)
+            except OSError as exc:
+                print(repr(exc))
+                return '', ''
+            try:
+                self.process.stdin.write(message)
+            except IOError as exc:
+                print(repr(exc))
+                return '', ''
+
+            try:
+                result = self.process.stdout.readline()
                 err = self.process.stderr.read()
-            except IOError:
-                pass
-            if err:
-                #print("error  message:", err)
-                self.last_err = err
+            except IOError as exc:
+                if exc.errno == 11:
+                    pass
+                else:
+                    return '', ''
+        finally:
             try:
                 os.kill(self.process.pid, signal.SIGSTOP)
             except OSError:
@@ -203,7 +226,7 @@ class Slave(object):
             if timeout > 0:
                 timer.cancel()
 
-        return result
+        return result.strip().lower(), err
 
     def __repr__(self):
         pr = ''
@@ -311,13 +334,13 @@ class Snake(object):
 
     def move(self):
         if self.dead:
-            return (None, None)
+            return None, None
         added = self.grow()
         removed = None
         if not self.ate_apple:
             removed = self.shrink()
         self.ate_apple = False
-        return (added, removed)
+        return added, removed
 
     def as_dict(self):
         return {'name': self.name,
@@ -339,7 +362,7 @@ class SnakeJudge(Judge):
         self.r = redis.StrictRedis(host='localhost', port=6379, db=0)
         self.leaderboard = dict(self.r.zrevrange('leaderboard', 0, -1, withscores=True))
 
-    def add_slave(self, args, key, color):
+    def add_slave_snake(self, args, key, color):
         slave = super(SnakeJudge, self).add_slave(args)
         snake = self.spawn_snake(color, key=key)
         self.snakes[key] = (slave, snake)
@@ -356,7 +379,7 @@ class SnakeJudge(Judge):
             self.board[p.x, p.y] = 'o'
 
     def kill_snake(self, snake):
-        if snake.dead: # Can't kill dead snake
+        if snake.dead:  # Can't kill dead snake
             return
         for p in snake.parts:
             self.board[p.x, p.y] = '.'
@@ -424,7 +447,6 @@ class SnakeJudge(Judge):
             heads = defaultdict(list)
             removed = []
             for key, (slave, snake) in self.snakes.items():
-                print("\n")
                 print(key[:3], slave, end=' ')
 
                 if slave.process.poll() is not None:
@@ -441,29 +463,26 @@ class SnakeJudge(Judge):
                     continue
 
                 self.board[(snake.head.x, snake.head.y)] = 'H'
-                r = slave.send(str(self.board) + '\n', 5)
+                r, err = slave.send(str(self.board) + '\n', 5)
                 self.board[(snake.head.x, snake.head.y)] = '#'
                 print(r)
-                err = slave.last_err
-                if r[:-1] not in ('left', 'right', 'up', 'down'):
-                    slave.kill_process()
-                    self.kill_snake(snake)
-                    if r:
-                        err += 'Received invalid command "%s"\n' % (r,)
-                
-                if err:
-                    now = datetime.today()
-                    err = str(now) + "\n" + err
+
                 previous_errors = self.r.get('snake:%s:err' % (key,)) or ''
                 previous_errors = previous_errors.decode('utf-8') + err
                 previous_errors = previous_errors.split('\n')[-100:]
                 errors = u"\n".join(previous_errors)
                 self.r.set('snake:%s:err' % (key,), errors.encode('utf-8'))
 
-                if r[:-1] not in ('left', 'right', 'up', 'down'):
+                message = ''
+                if r not in ('left', 'right', 'up', 'down'):
+                    print("Killing because %r is not a direction" % (r,))
+                    slave.kill_process()
+                    self.kill_snake(snake)
+                    if r:
+                        message = 'Received invalid command %r\n' % (r,)
                     continue
 
-                snake.direction = r[:-1]
+                snake.direction = r
                 head, tail = snake.move()
                 if head is not None:
                     heads[head].append(snake)
@@ -471,7 +490,6 @@ class SnakeJudge(Judge):
                     removed.append(tail)
 
             self.check_collisions(heads, removed)
-            # print(str(self.board))
             self.r.set('board', str(self.board))
             self.r.set('snakes', json.dumps(self.as_dict()))
             self.update_leaderboard()
@@ -487,10 +505,10 @@ class RedisCommandThread(threading.Thread):
         time.sleep(3)
         while True:
             # reload_slave;<slave_id>;<slave_name>;<slave_code>
-            _, message = judge.r.blpop('commands')
+            _, message = self.judge.r.blpop('commands')
             message = message.decode('utf-8')
             command, slave_id, slave_name, slave_code = message.split(';', 3)
-            judge.commands.put((command, slave_id, slave_name, slave_code))
+            self.judge.commands.put((command, slave_id, slave_name, slave_code))
 
 
 SCRIPT = r"""
@@ -502,15 +520,16 @@ while True:
     sys.stdout.write('\n')
 """
 
-with open('keys', 'r') as keys_file:
-    KEYS = keys_file.read().split("\n")
-KEYS = [x.strip() for x in KEYS]
-KEYS = [x for x in KEYS if x]
 
-if __name__ == '__main__':
+def main():
+    with open('keys', 'r') as keys_file:
+        keys = keys_file.read().split("\n")
+    keys = [x.strip() for x in keys]
+    keys = [x for x in keys if x]
+
     judge = SnakeJudge(80, 60)
     random.seed()
-    for key in KEYS:
+    for key in keys:
         color = judge.r.get('snake:%s:color' % key)
         if color is None:
             h = random.random()
@@ -523,7 +542,7 @@ if __name__ == '__main__':
         name = judge.r.get('snake:%s:name' % key)
         if name is None:
             judge.r.set('snake:%s:name' % key, u'Anonymous')
-        judge.add_slave(
+        judge.add_slave_snake(
             script.decode('utf-8') if script is not None
             else SCRIPT, key, color=color)
 
@@ -534,3 +553,7 @@ if __name__ == '__main__':
     thread.start()
 
     judge.run()
+
+
+if __name__ == '__main__':
+    main()

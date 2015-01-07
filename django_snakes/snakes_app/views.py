@@ -67,14 +67,21 @@ def key_board(request, key):
 def check_board(request):
     snakes = r.get('snakes')
     key = request.GET.get('KEY')
-    snakes =  json.loads(snakes.decode('utf-8'))
+    snakes = json.loads(snakes.decode('utf-8'))
     if snakes is None:
         return {'snakes': []}
+
+    if key is None:
+        return snakes
+
+    snake_err = (r.get('snake:%s:err' % key) or '').decode('utf-8')
+    snaker_err_lines = snake_err.split("\n")[-20:]
 
     for snake in snakes['snakes']:
         snake['current'] = snake['key'] == key
         del snake['key']
-        
+
+    snakes['err'] = "\n".join(snaker_err_lines)
     return snakes
 
 
