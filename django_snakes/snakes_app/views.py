@@ -2,11 +2,11 @@ from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 
-import redis
 import json
+from snakes.db import get_db
 
 
-r = redis.StrictRedis(host='localhost', port=6379, db=0)
+r = get_db()
 
 
 def json_response(view):
@@ -120,9 +120,13 @@ def reload_code(request):
         or len(request.POST['slave_name']) == 0
         or len(request.POST['slave_code']) == 0):
         return redirect(reverse('board'))
-    command = u'reload_slave;%s;%s;%s' % (request.POST['slave_id'],
-                                          request.POST['slave_name'],
-                                          request.POST['slave_code'])
+
+    command = json.dumps((
+        'reload_slave',
+        request.POST['slave_id'],
+        request.POST['slave_name'],
+        request.POST['slave_code']
+    ))
     r.rpush('commands', command.encode('utf-8'))
     r.set('snake:%s:name' % request.POST['slave_id'].encode('utf-8'),
           request.POST['slave_name'].encode('utf-8'))

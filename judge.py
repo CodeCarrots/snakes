@@ -17,6 +17,11 @@ import Queue
 from collections import namedtuple, deque, defaultdict
 import redis
 import codecs
+import logging
+from db import get_db
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 JAIL_ROOT = '/jail/cells'
@@ -47,10 +52,15 @@ def safe_makedirs(path, mode=0o777):
             raise
 
 
+def run_command(*args):
+    print("Running ", args[0])
+    return subprocess.check_call(*args)
+
+
 def create_slave_group():
     try:
-        subprocess.check_call(['addgroup',
-                               '--system', SLAVE_GROUP])
+        run_command(['addgroup',
+                     '--system', SLAVE_GROUP])
     except subprocess.CalledProcessError as e:
         if e.returncode != 1: # group already exists?
             raise
@@ -77,33 +87,33 @@ def create_slave_env(name):
     safe_makedirs(os.path.join(cell, 'lib'))
     safe_makedirs(os.path.join(cell, 'lib64'))
     safe_makedirs(os.path.join(cell, 'usr'))
-    subprocess.check_call([
+    run_command([
         'ln',
         os.path.join(JAIL_ZYGOTE, 'python'),
         os.path.join(cell, 'python')
     ])
-    subprocess.check_call([
+    run_command([
         'mount', '--bind',
         os.path.join(JAIL_ZYGOTE, 'bin'),
         os.path.join(cell, 'bin')
     ])
-    subprocess.check_call([
+    run_command([
         'mount', '--bind',
         os.path.join(JAIL_ZYGOTE, 'lib'),
         os.path.join(cell, 'lib')
     ])
-    subprocess.check_call([
+    run_command([
         'mount', '--bind',
         os.path.join(JAIL_ZYGOTE, 'lib64'),
         os.path.join(cell, 'lib64')
     ])
-    subprocess.check_call([
+    run_command([
         'mount', '--bind',
         os.path.join(JAIL_ZYGOTE, 'usr'),
         os.path.join(cell, 'usr')
     ])
     # Create user
-    subprocess.check_call(['/usr/sbin/adduser',
+    run_command(['/usr/sbin/adduser',
                            '--system',
                            '--ingroup', SLAVE_GROUP,
                            '--home', cell,
@@ -162,7 +172,7 @@ class Slave(object):
         with codecs.open(os.path.join(self.cell, 'script.py'), 'w', encoding='utf-8') as f:
             f.write(self.script)
         os.chmod(os.path.join(self.cell, 'script.py'), 0o755)
-        print("running %s\n" % (self.cell,))
+        logger.info("running %s" % (self.cell,))
         self.process = subprocess.Popen(['./python', 'script.py'],
                                         shell=False,
                                         stdin=subprocess.PIPE,
@@ -189,6 +199,7 @@ class Slave(object):
                 os.kill(pid, signal.SIGKILL)
             except OSError:
                 pass
+        self.process.wait()
 
     def send(self, message, timeout=0):
         """Sends a message to the slave and returns response."""
@@ -202,12 +213,12 @@ class Slave(object):
             try:
                 os.kill(self.process.pid, signal.SIGCONT)
             except OSError as exc:
-                print(repr(exc))
+                logger.exception("Failed to resume %s" % (self.cell,))
                 return '', ''
             try:
                 self.process.stdin.write(message)
             except IOError as exc:
-                print(repr(exc))
+                logger.exception("Failed to communicate with %s" % (self.cell,))
                 return '', ''
 
             try:
@@ -244,10 +255,10 @@ class Judge(object):
         create_slave_group()
         self.slaves = []
 
-    def add_slave(self, args):
+    def add_slave(self, slave_code):
         slave_name = SLAVE_USERNAME_PATTERN.format(len(self.slaves) + 1)
         create_slave_env(slave_name)
-        slave = Slave(slave_name, args)
+        slave = Slave(slave_name, slave_code)
         self.slaves.append(slave)
         return slave
 
@@ -350,8 +361,27 @@ class Snake(object):
                 'color': self.color}
 
 
+class Worker(threading.Thread):
+
+    def __init__(self, tasks):
+        super(Worker, self).__init__()
+        self.tasks = tasks
+        self.daemon = True
+        self.stopped = False
+        self.start()
+
+    def run(self):
+        while not self.stopped:
+            func, args, kargs = self.tasks.get()
+            try:
+                func(*args, **kargs)
+            except Exception as exc:
+                logger.exception("Error while executing task\n%r\n%r" % (args, kargs))
+            self.tasks.task_done()
+
+
 class SnakeJudge(Judge):
-    def __init__(self, width=10, height=10):
+    def __init__(self, width=10, height=10, threads=4):
         super(SnakeJudge, self).__init__()
         self.commands = Queue.Queue()
         self.width = width
@@ -359,11 +389,18 @@ class SnakeJudge(Judge):
         self.board = Board(width, height)
         self.turn = 0
         self.snakes = {}
-        self.r = redis.StrictRedis(host='localhost', port=6379, db=0)
+        self.r = get_db()
         self.leaderboard = dict(self.r.zrevrange('leaderboard', 0, -1, withscores=True))
+        self._load_snakes()
+        self._threads = threads
 
-    def add_slave_snake(self, args, key, color):
-        slave = super(SnakeJudge, self).add_slave(args)
+    def _load_snakes(self):
+        keys = self.r.smembers('keys')
+        for key in keys:
+            self.command_add_snake(key)
+
+    def add_slave_snake(self, script, key, color):
+        slave = super(SnakeJudge, self).add_slave(script)
         snake = self.spawn_snake(color, key=key)
         self.snakes[key] = (slave, snake)
         return key
@@ -418,17 +455,84 @@ class SnakeJudge(Judge):
         return {'snakes': [s[1].as_dict() for s in self.snakes.values()],
                 'apples': [[p.x, p.y] for p in self.board.apples]}
 
+    def clear_leaderboard(self):
+        self.r.delete('leaderboard')
+        for key, (slave, snake) in self.snakes.items():
+            self.leaderboard[key] = 0
+            self.r.zadd('leaderboard', 0, key)
+
+    def reset_snake(self, snake, slave, key):
+        self.kill_snake(snake)
+        self.snakes[key] = (slave, self.spawn_snake(snake.color, key=key))
+        slave.kill_process()
+        slave.run()
+
+    def command_reset(self):
+        self.board = Board(self.width, self.height)
+        for key, (slave, snake) in self.snakes.items():
+            self.reset_snake(snake, slave, key)
+        self.clear_leaderboard()
+
+    def command_reload_slave(self, slave_id, slave_name, slave_code):
+        slave, snake = self.snakes.get(slave_id, (None, None))
+        if slave is not None:
+            snake.name = slave_name
+            slave.script = slave_code
+            slave.kill_process()
+            self.r.set('snake:%s:err' % (slave_id,), '')
+
+    def command_remove_snake(self, key):
+        if key not in self.snakes:
+            return
+        slave, snake = self.snakes[key]
+        self.kill_snake(snake)
+        slave.kill_process()
+        del self.snakes[key]
+        del self.leaderboard[key]
+        self.r.zrem('leaderboard', key)
+        self.r.srem("keys", key)
+
+    def command_add_snake(self, key):
+        if key in self.snakes:
+            return
+        self.r.sadd("keys", key)
+        color = self.r.get('snake:%s:color' % key)
+        if color is None:
+            h = random.random()
+            s = 1
+            v = 0.8
+            r, g, b = colorsys.hsv_to_rgb(h, s, v)
+            color = ('#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))).lower()
+        self.r.set('snake:%s:color' % key, color)
+        script = self.r.get('snake:%s:code' % key)
+        if script is None:
+            script = SCRIPT
+        else:
+            script = script.decode('utf-8')
+        name = self.r.get('snake:%s:name' % key)
+        if name is None:
+            self.r.set('snake:%s:name' % key, u'Anonymous')
+        self.add_slave_snake(script, key, color=color)
+        slave, snake = self.snakes[key]
+        slave.run()
+
     def run_commands(self):
         try:
             while True:
-                command, slave_id, slave_name, slave_code = self.commands.get_nowait()
+                command_args = self.commands.get_nowait()
+                command = command_args[0]
+                args = command_args[1:]
                 if command == 'reload_slave':
-                    slave, snake = self.snakes.get(slave_id, (None, None))
-                    if slave is not None:
-                        snake.name = slave_name
-                        slave.script = slave_code
-                        slave.kill_process()
-                        self.r.set('snake:%s:err' % (slave_id,), '')
+                    slave_id, slave_name, slave_code = args
+                    self.command_reload_slave(slave_id, slave_name, slave_code)
+                if command == 'reset':
+                    self.command_reset()
+                if command == 'remove_snake':
+                    key = args[0]
+                    self.command_remove_snake(key)
+                if command == 'add_snake':
+                    key = args[0]
+                    self.command_add_snake(key)
         except Queue.Empty:
             pass
 
@@ -438,62 +542,121 @@ class SnakeJudge(Judge):
                 self.leaderboard[key] = len(snake.parts)
                 self.r.zadd('leaderboard', len(snake.parts), key)
 
-    def run(self):
-        for slave in self.slaves:
+    def move_snake(self, key, slave, snake):
+        logger.info("%s: %s" % (key[:3], slave))
+        if slave.process.poll() is not None:
+            logger.info("%s: DEAD - process" % (key,))
+            logger.info("%s: Reviving..." % (key,))
+            self.kill_snake(snake)
+            self.snakes[key] = (slave, self.spawn_snake(snake.color, key=key))
             slave.run()
+            return
 
+        if snake.dead:
+            logger.info("%s: DEAD - collision?" % (key,))
+            slave.kill_process()
+            return
+
+        self.board[(snake.head.x, snake.head.y)] = 'H'
+        r, err = slave.send(str(self.board) + '\n', 5)
+        self.board[(snake.head.x, snake.head.y)] = '#'
+        logger.info("%s: move %s" % (key, r))
+
+        previous_errors = self.r.get('snake:%s:err' % (key,)) or ''
+        previous_errors = previous_errors.decode('utf-8') + err
+        previous_errors = previous_errors.split('\n')[-100:]
+        errors = u"\n".join(previous_errors)
+        self.r.set('snake:%s:err' % (key,), errors.encode('utf-8'))
+
+        message = ''
+        if r not in ('left', 'right', 'up', 'down'):
+            logger.info("%s: killing because %r is not a direction" % (key, r))
+            slave.kill_process()
+            self.kill_snake(snake)
+            if r:
+                message = 'Received invalid command %r\n' % (r,)
+            return
+
+        snake.direction = r
+        head, tail = snake.move()
+        return head, tail
+
+    def run_infinite(self, queue):
         while True:
             self.run_commands()
             heads = defaultdict(list)
             removed = []
             for key, (slave, snake) in self.snakes.items():
-                print(key[:3], slave, end=' ')
 
-                if slave.process.poll() is not None:
-                    print('DEAD')
-                    print('Reviving...')
-                    self.kill_snake(snake)
-                    self.snakes[key] = (slave, self.spawn_snake(snake.color, key=key))
-                    slave.run()
-                    continue
+                def slave_step(key_, slave_, snake_):
+                    head_tail = self.move_snake(key_, slave_, snake_)
+                    if head_tail is None:
+                        return
+                    head, tail = head_tail
+                    if head is not None:
+                        heads[head].append(snake_)
+                    if tail is not None:
+                        removed.append(tail)
+                queue.put((slave_step, (key, slave, snake), {}))
 
-                if snake.dead:
-                    print('DEAD')
-                    slave.kill_process()
-                    continue
-
-                self.board[(snake.head.x, snake.head.y)] = 'H'
-                r, err = slave.send(str(self.board) + '\n', 5)
-                self.board[(snake.head.x, snake.head.y)] = '#'
-                print(r)
-
-                previous_errors = self.r.get('snake:%s:err' % (key,)) or ''
-                previous_errors = previous_errors.decode('utf-8') + err
-                previous_errors = previous_errors.split('\n')[-100:]
-                errors = u"\n".join(previous_errors)
-                self.r.set('snake:%s:err' % (key,), errors.encode('utf-8'))
-
-                message = ''
-                if r not in ('left', 'right', 'up', 'down'):
-                    print("Killing because %r is not a direction" % (r,))
-                    slave.kill_process()
-                    self.kill_snake(snake)
-                    if r:
-                        message = 'Received invalid command %r\n' % (r,)
-                    continue
-
-                snake.direction = r
-                head, tail = snake.move()
-                if head is not None:
-                    heads[head].append(snake)
-                if tail is not None:
-                    removed.append(tail)
-
+            queue.join()
             self.check_collisions(heads, removed)
             self.r.set('board', str(self.board))
             self.r.set('snakes', json.dumps(self.as_dict()))
             self.update_leaderboard()
             time.sleep(1)
+
+    def run(self):
+        # for slave in self.slaves:
+        #     slave.run()
+
+        queue = Queue.Queue()
+        threads = []
+        for i in range(self._threads):
+            thread = Worker(queue)
+            threads.append(thread)
+        try:
+            self.run_infinite(queue)
+        except KeyboardInterrupt:
+            pass
+
+        for thread in threads:
+            thread.stopped = True
+        for thread in threads:
+            queue.put((lambda: None, (), {}))
+        for thread in threads:
+            thread.join()
+
+
+# class MultiBoardJudge(object):
+#
+#     def __init__(self, r):
+#         self.r = r
+#
+#     def command_create_board(self, name):
+#         pass
+#
+#     def command_reload_snake(self, slave_id, slave_name, slave_code):
+#         slave, snake = self.snakes.get(slave_id, (None, None))
+#         if slave is not None:
+#             snake.name = slave_name
+#             slave.script = slave_code
+#             slave.kill_process()
+#             self.r.set('snake:%s:err' % (slave_id,), '')
+#
+#     def run_commands(self):
+#         try:
+#             while True:
+#                 command_with_args = self.commands.get_nowait()
+#                 command = command_with_args[0]
+#                 args = command_with_args[1:]
+#                 if command == 'create_board':
+#                     self.command_create_board(*args)
+#                 if command == 'reload_slave':
+#                     slave_id, slave_name, slave_code = args
+#                     self.command_reload_snake(slave_id, slave_name, slave_code)
+#         except Queue.Empty:
+#             pass
 
 
 class RedisCommandThread(threading.Thread):
@@ -507,8 +670,8 @@ class RedisCommandThread(threading.Thread):
             # reload_slave;<slave_id>;<slave_name>;<slave_code>
             _, message = self.judge.r.blpop('commands')
             message = message.decode('utf-8')
-            command, slave_id, slave_name, slave_code = message.split(';', 3)
-            self.judge.commands.put((command, slave_id, slave_name, slave_code))
+            message = json.loads(message)
+            self.judge.commands.put(message)
 
 
 SCRIPT = r"""
@@ -522,29 +685,15 @@ while True:
 
 
 def main():
-    with open('keys', 'r') as keys_file:
-        keys = keys_file.read().split("\n")
-    keys = [x.strip() for x in keys]
-    keys = [x for x in keys if x]
+    # with open('keys', 'r') as keys_file:
+    #     keys = keys_file.read().split("\n")
+    # keys = [x.strip() for x in keys]
+    # keys = [x for x in keys if x]
 
     judge = SnakeJudge(80, 60)
     random.seed()
-    for key in keys:
-        color = judge.r.get('snake:%s:color' % key)
-        if color is None:
-            h = random.random()
-            s = 1
-            v = 0.8
-            r, g, b = colorsys.hsv_to_rgb(h, s, v)
-            color = ('#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))).lower()
-        judge.r.set('snake:%s:color' % key, color)
-        script = judge.r.get('snake:%s:code' % key)
-        name = judge.r.get('snake:%s:name' % key)
-        if name is None:
-            judge.r.set('snake:%s:name' % key, u'Anonymous')
-        judge.add_slave_snake(
-            script.decode('utf-8') if script is not None
-            else SCRIPT, key, color=color)
+    # for key in keys:
+    #     judge.command_add_snake(key)
 
     print(judge.snakes.keys())
 
