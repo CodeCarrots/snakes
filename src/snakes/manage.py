@@ -1,10 +1,20 @@
 #!/usr/bin/env python
 import json
 import argparse
+import time
 from db import get_db
 
 
 r = get_db()
+
+
+def show_board(args):
+  board = r.get('board')
+  print board
+  while args.repeat:
+    time.sleep(0.5)
+    board = r.get('board')
+    print board
 
 
 def snake_name(code):
@@ -110,6 +120,10 @@ remove_snake_parser = subparsers.add_parser('remove_snake')
 remove_snake_parser.add_argument('-a', "--all", action='store_true')
 remove_snake_parser.add_argument('key', help='snake key', nargs='?')
 remove_snake_parser.set_defaults(func=remove_snake)
+
+board = subparsers.add_parser('board')
+board.add_argument('-r', '--repeat', action='store_true')
+board.set_defaults(func=show_board)
 
 parsed = parser.parse_args()
 parsed.func(parsed)

@@ -446,6 +446,7 @@ class SnakeJudge(Judge):
             if self.board[p.x, p.y] == '#':
                 for snake in snakes:
                     self.kill_snake(snake)
+                self.board[p.x, p.y] = '#'
                 continue
 
             # Check collisions with apples
@@ -598,8 +599,17 @@ class SnakeJudge(Judge):
         snake.direction = r
         head, tail = snake.move()
         return head, tail
-
+  
+    def wait(self, sec):
+        while True:
+	    cur = time.time()
+	    if time.time() > self.start + sec:
+	        self.start = self.start + sec
+	        break
+	    time.sleep(0.01)
+        
     def run_infinite(self, queue):
+        self.start = time.time()
         while True:
             self.run_commands()
             heads = defaultdict(list)
@@ -622,7 +632,7 @@ class SnakeJudge(Judge):
             self.r.set('board', str(self.board))
             self.r.set('snakes', json.dumps(self.as_dict()))
             self.update_leaderboard()
-            time.sleep(1)
+            self.wait(1)
 
     def run(self):
         # for slave in self.slaves:
