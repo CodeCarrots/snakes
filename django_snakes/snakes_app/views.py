@@ -4,6 +4,7 @@ from django.shortcuts import render, redirect
 
 import json
 from snakes.db import get_db
+from snakes.example import get_example
 
 
 r = get_db()
@@ -30,12 +31,6 @@ def board(request):
         })
 
 
-SCRIPT = ''
-
-with open('../example.py') as plik:
-    SCRIPT = plik.read()
-
-
 def key_board(request, key):
     snake_name = r.get('snake:%s:name' % key)
     snake_color = '#fff'
@@ -45,7 +40,8 @@ def key_board(request, key):
     else:
         invalid_key = False
         snake_name = snake_name.decode('utf-8')
-        snake_code = (r.get('snake:%s:code' % key) or SCRIPT).decode('utf-8')
+        snake_code = r.get('snake:%s:code' % key).decode('utf-8')
+        # snake_code = (r.get('snake:%s:code' % key) or script).decode('utf-8')
         snake_color = (r.get('snake:%s:color' % key) or '#fff').decode('utf-8')
         snake_err = (r.get('snake:%s:err' % key) or '').decode('utf-8')
 

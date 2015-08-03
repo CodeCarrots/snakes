@@ -19,6 +19,7 @@ import redis
 import codecs
 import logging
 from db import get_db
+from snakes.example import get_example, WIDTH, HEIGHT
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,20 +29,6 @@ JAIL_ROOT = '/jail/cells'
 JAIL_ZYGOTE = '/jail/zygote'
 SLAVE_GROUP = 'slaves'
 SLAVE_USERNAME_PATTERN = 'slave{:02d}'
-
-#
-# def print(*args, **kwargs):
-#     for arg in args:
-#         try:
-#             sys.stdout.write(arg.encode('utf8'))
-#         except Exception:
-#             try:
-#                 sys.stdout.write(str(arg))
-#             except Exception:
-#                 sys.stdout.write(arg)
-#     end = kwargs.get('end')
-#     if end:
-#         sys.stdout.write(end)
 
 
 def safe_makedirs(path, mode=0o777):
@@ -149,12 +136,13 @@ def get_process_children(pid):
 
 
 class Slave(object):
-    def __init__(self, env, script):
+    def __init__(self, env, script, slot):
         self.env = env
         self.script = script
         self.cell = os.path.join(JAIL_ROOT, self.env)
         self.stderr = StringIO.StringIO()
         self.last_err = ''
+        self.slot = slot
 
     def instrument_process(self):
         uid = pwd.getpwnam(self.env).pw_uid
@@ -254,13 +242,28 @@ class Judge(object):
     def __init__(self):
         create_slave_group()
         self.slaves = []
+        self.used_slots = set()
+
+    def get_free_slot(self):
+        i = 0
+        while True:
+            if i not in self.used_slots:
+                break
+            i += 1
+        self.used_slots.add(i)
+        return i
 
     def add_slave(self, slave_code):
-        slave_name = SLAVE_USERNAME_PATTERN.format(len(self.slaves) + 1)
+        slot = self.get_free_slot()
+        slave_name = SLAVE_USERNAME_PATTERN.format(slot)
         create_slave_env(slave_name)
-        slave = Slave(slave_name, slave_code)
+        slave = Slave(slave_name, slave_code, slot)
         self.slaves.append(slave)
         return slave
+
+    def remove_slave(self, slave):
+        self.slaves.remove(slave)
+        self.used_slots.remove(slave.slot)
 
     def run(self):
         for slave in self.slaves:
@@ -281,6 +284,12 @@ class Board(object):
         self.fields = [['.'] * width for _ in range(height)]
         self.empty_fields = set(Point(x, y) for x in range(width) for y in range(height))
         self.apples = set()
+    def copy(self):
+        board = Board(self.width, self.height)
+        board.fields = [list(x) for x in self.fields]
+        board.empty_fields = set(self.empty_fields)
+        board.apples = set(self.apples)
+        return board
 
     def __getitem__(self, (x, y)):
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
@@ -447,7 +456,7 @@ class SnakeJudge(Judge):
 
         if len(self.board.apples) < 10:
             self.spawn_apple()
-        elif self.turn % 3 == 0:
+        elif self.turn % 1 == 0:
             self.spawn_apple()
         self.turn += 1
 
@@ -464,6 +473,7 @@ class SnakeJudge(Judge):
     def reset_snake(self, snake, slave, key):
         self.kill_snake(snake)
         self.snakes[key] = (slave, self.spawn_snake(snake.color, key=key))
+        slave.script = self.get_snake_code(key)
         slave.kill_process()
         slave.run()
 
@@ -491,6 +501,18 @@ class SnakeJudge(Judge):
         del self.leaderboard[key]
         self.r.zrem('leaderboard', key)
         self.r.srem("keys", key)
+        self.remove_slave(slave)
+
+    def get_snake_code(self, key):
+        script = self.r.get('snake:%s:code' % key)
+        if script is None:
+            logger.info("Loaded code for %s from example" % (key,))
+            script = get_example()
+            self.r.set('snake:%s:code' % key, script.encode('utf-8'))
+        else:
+            logger.info("Loaded code for %s from database" % (key,))
+            script = script.decode('utf-8')
+        return script
 
     def command_add_snake(self, key):
         if key in self.snakes:
@@ -504,11 +526,7 @@ class SnakeJudge(Judge):
             r, g, b = colorsys.hsv_to_rgb(h, s, v)
             color = ('#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))).lower()
         self.r.set('snake:%s:color' % key, color)
-        script = self.r.get('snake:%s:code' % key)
-        if script is None:
-            script = SCRIPT
-        else:
-            script = script.decode('utf-8')
+        script = self.get_snake_code(key)
         name = self.r.get('snake:%s:name' % key)
         if name is None:
             self.r.set('snake:%s:name' % key, u'Anonymous')
@@ -556,11 +574,11 @@ class SnakeJudge(Judge):
             logger.info("%s: DEAD - collision?" % (key,))
             slave.kill_process()
             return
-
-        self.board[(snake.head.x, snake.head.y)] = 'H'
-        r, err = slave.send(str(self.board) + '\n', 5)
-        self.board[(snake.head.x, snake.head.y)] = '#'
-        logger.info("%s: move %s" % (key, r))
+        board = self.board.copy()
+        board[(snake.head.x, snake.head.y)] = 'H'
+        r, err = slave.send(str(board) + '\n', 5)
+        #self.board[(snake.head.x, snake.head.y)] = '#'
+        logger.info("%s: move %s" % (key, r[:50]))
 
         previous_errors = self.r.get('snake:%s:err' % (key,)) or ''
         previous_errors = previous_errors.decode('utf-8') + err
@@ -570,7 +588,7 @@ class SnakeJudge(Judge):
 
         message = ''
         if r not in ('left', 'right', 'up', 'down'):
-            logger.info("%s: killing because %r is not a direction" % (key, r))
+            logger.info("%s: killing because %r is not a direction" % (key, r[:50]))
             slave.kill_process()
             self.kill_snake(snake)
             if r:
@@ -674,14 +692,14 @@ class RedisCommandThread(threading.Thread):
             self.judge.commands.put(message)
 
 
-SCRIPT = r"""
-import sys, random
-while True:
-    for x in range(60):
-        sys.stdin.readline()
-    sys.stdout.write(random.choice(['left', 'right', 'up', 'down']))
-    sys.stdout.write('\n')
-"""
+#SCRIPT = r"""
+#import sys, random
+#while True:
+#    for x in range(60):
+#        sys.stdin.readline()
+#    sys.stdout.write(random.choice(['left', 'right', 'up', 'down']))
+#    sys.stdout.write('\n')
+#"""
 
 
 def main():
@@ -690,7 +708,7 @@ def main():
     # keys = [x.strip() for x in keys]
     # keys = [x for x in keys if x]
 
-    judge = SnakeJudge(80, 60)
+    judge = SnakeJudge(WIDTH, HEIGHT)
     random.seed()
     # for key in keys:
     #     judge.command_add_snake(key)
