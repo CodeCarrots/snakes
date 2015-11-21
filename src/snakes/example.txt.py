@@ -1,7 +1,7 @@
 import sys
 import random
 
-WIDTH, HEIGHT = 80, 60
+WIDTH, HEIGHT = {WIDTH}, {HEIGHT}
 
 # Change here!
 # ------------

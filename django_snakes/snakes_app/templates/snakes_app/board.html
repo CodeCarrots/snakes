@@ -9,7 +9,7 @@
 </head>
 <body>
 <div id="leaderboard"></div>
-<canvas width="800" height="600" id="canvas">{{ board }}</canvas>
+<canvas width="{{ WIDTH }}0" height="{{ HEIGHT }}0" id="canvas">{{ board }}</canvas>
 {% if key %}
 <form action="/snakes_app/reload/" method="POST">
     {% csrf_token %}

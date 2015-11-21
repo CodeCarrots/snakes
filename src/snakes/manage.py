@@ -3,7 +3,7 @@ import json
 import argparse
 import time
 from db import get_db
-
+from example import get_example
 
 r = get_db()
 
@@ -14,6 +14,7 @@ def show_board(args):
   while args.repeat:
     time.sleep(0.5)
     board = r.get('board')
+    print "---"
     print board
 
 
@@ -51,7 +52,7 @@ def clear_program(args):
     keys = ['snake:%s:code' % key for key in keys]
 
     for key in keys:
-        r.delete(key)
+        r.set(key, get_example())
     reset(args)
 
 
@@ -111,6 +112,9 @@ players.set_defaults(func=players_func)
 
 reset_parser = subparsers.add_parser('reset')
 reset_parser.set_defaults(func=reset)
+
+reset_code = subparsers.add_parser('reset_code')
+reset_code.set_defaults(func=reset_code)
 
 add_snake_parser = subparsers.add_parser('add_snake')
 add_snake_parser.add_argument('key', help='snake key')

@@ -284,6 +284,7 @@ class Board(object):
         self.fields = [['.'] * width for _ in range(height)]
         self.empty_fields = set(Point(x, y) for x in range(width) for y in range(height))
         self.apples = set()
+
     def copy(self):
         board = Board(self.width, self.height)
         board.fields = [list(x) for x in self.fields]
@@ -424,12 +425,14 @@ class SnakeJudge(Judge):
         if p is not None:
             self.board[p.x, p.y] = 'o'
 
-    def kill_snake(self, snake):
+    def kill_snake(self, snake, clear=False):
         if snake.dead:  # Can't kill dead snake
+            return
+        snake.dead = True
+        if not clear:
             return
         for p in snake.parts:
             self.board[p.x, p.y] = '.'
-        snake.dead = True
 
     def check_collisions(self, heads, removed):
         for p in removed:
@@ -446,15 +449,23 @@ class SnakeJudge(Judge):
             if self.board[p.x, p.y] == '#':
                 for snake in snakes:
                     self.kill_snake(snake)
-                self.board[p.x, p.y] = '#'
                 continue
 
             # Check collisions with apples
             if self.board[p.x, p.y] == 'o':
                 for snake in snakes:
                     snake.ate_apple = True
-            self.board[p.x, p.y] = '#'
-
+                self.board[p.x, p.y] = '#'
+        
+        board = Board(self.width, self.height)
+        for snake in self.snakes.values():
+            snake = snake[1]
+            for part in snake.parts:
+                board[part.x, part.y] = '#'
+                
+        for apple in self.board.apples:
+            board[apple.x, apple.y] = 'o'
+        self.board = board
         if len(self.board.apples) < 10:
             self.spawn_apple()
         elif self.turn % 1 == 0:
@@ -472,7 +483,7 @@ class SnakeJudge(Judge):
             self.r.zadd('leaderboard', 0, key)
 
     def reset_snake(self, snake, slave, key):
-        self.kill_snake(snake)
+        self.kill_snake(snake, clear=True)
         self.snakes[key] = (slave, self.spawn_snake(snake.color, key=key))
         slave.script = self.get_snake_code(key)
         slave.kill_process()
@@ -496,7 +507,7 @@ class SnakeJudge(Judge):
         if key not in self.snakes:
             return
         slave, snake = self.snakes[key]
-        self.kill_snake(snake)
+        self.kill_snake(snake, clear=True)
         slave.kill_process()
         del self.snakes[key]
         del self.leaderboard[key]
@@ -566,7 +577,7 @@ class SnakeJudge(Judge):
         if slave.process.poll() is not None:
             logger.info("%s: DEAD - process" % (key,))
             logger.info("%s: Reviving..." % (key,))
-            self.kill_snake(snake)
+            self.kill_snake(snake, clear=True)
             self.snakes[key] = (slave, self.spawn_snake(snake.color, key=key))
             slave.run()
             return
@@ -591,7 +602,7 @@ class SnakeJudge(Judge):
         if r not in ('left', 'right', 'up', 'down'):
             logger.info("%s: killing because %r is not a direction" % (key, r[:50]))
             slave.kill_process()
-            self.kill_snake(snake)
+            self.kill_snake(snake, clear=True)
             if r:
                 message = 'Received invalid command %r\n' % (r,)
             return

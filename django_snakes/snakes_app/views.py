@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect
 
 import json
 from snakes.db import get_db
-from snakes.example import get_example
+from snakes.example import get_example, WIDTH, HEIGHT
 
 
 r = get_db()
@@ -27,7 +27,9 @@ def board(request):
         'snakes_app/board.html',
         {
             'board': r.get('board'),
-            'key': None
+            'key': None,
+            'WIDTH': WIDTH,
+            'HEIGHT': HEIGHT
         })
 
 
@@ -55,7 +57,9 @@ def key_board(request, key):
             'code': snake_code,
             'color': snake_color,
             'err': snake_err,
-            'invalid_key': invalid_key
+            'invalid_key': invalid_key,
+            'WIDTH': WIDTH,
+            'HEIGHT': HEIGHT
         })
 
 

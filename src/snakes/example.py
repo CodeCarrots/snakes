@@ -1,10 +1,13 @@
+import os
 
-WIDTH = 80
-HEIGHT = 60
+WIDTH = 120
+HEIGHT = 80
 
 def get_example():
-    with open('snakes/example.txt.py') as plik:
-        return plik.read().format({
+    p = os.path.join(os.path.dirname(__file__), 'example.txt.py')
+    with open(p) as plik:
+        data = plik.read()
+        return data.format(**{
             'WIDTH': WIDTH,
             'HEIGHT': HEIGHT
         })
