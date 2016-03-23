@@ -282,48 +282,65 @@ class Board(object):
         self.width = width
         self.height = height
         self.fields = [['.'] * width for _ in range(height)]
-        self.empty_fields = set(Point(x, y) for x in range(width) for y in range(height))
+        self.h_x = None
+        self.h_y = None
+        #self.empty_fields = set(Point(x, y) for x in range(width) for y in range(height))
         self.apples = set()
 
     def copy(self):
         board = Board(self.width, self.height)
-        board.fields = [list(x) for x in self.fields]
-        board.empty_fields = set(self.empty_fields)
+        board.fields = self.fields
+        #board.fields = [list(x) for x in self.fields]
+        #board.empty_fields = set(self.empty_fields)
         board.apples = set(self.apples)
         return board
 
     def __getitem__(self, (x, y)):
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return '#'
+        if x == self.h_x and y == self.h_y:
+            return 'H'
         return self.fields[y][x]
 
     def __setitem__(self, (x, y), value):
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return
 
-        self.fields[y][x] = value
+        if value != 'H':
+            self.fields[y][x] = value
+        else:
+            self.h_x = x
+            self.h_y = y
 
         if value == 'o':
             self.apples.add(Point(x, y))
         else:
             self.apples.discard(Point(x, y))
 
-        if value == '.':
-            self.empty_fields.add(Point(x, y))
-        else:
-            self.empty_fields.discard(Point(x, y))
+        #if value == '.':
+        #    self.empty_fields.add(Point(x, y))
+        #else:
+        #    self.empty_fields.discard(Point(x, y))
 
     def random_empty_field(self):
-        if len(self.empty_fields) == 0:
-            return None
-        return random.sample(self.empty_fields, 1)[0]
+        #if len(self.empty_fields) == 0:
+        #    return None
+        for i in range(100):
+            x = random.randrange(self.width)
+            y = random.randrange(self.height)
+            if self[(x, y)] == '.':
+                return Point(x, y)
+        # return random.sample(self.empty_fields, 1)[0]
 
     def apples(self):
         return self.apples
 
     def __str__(self):
         result = []
-        for row in self.fields:
+        for y, row in enumerate(self.fields):
+            if y ==  self.h_y:
+                row = list(row)
+                row[self.h_x] = 'H'
             result.append(''.join(row))
         return '\n'.join(result)
 
@@ -464,7 +481,7 @@ class SnakeJudge(Judge):
                 board[part.x, part.y] = '#'
                 
         for apple in self.board.apples:
-            board[apple.x, apple.y] = 'o'
+	    board[apple.x, apple.y] = 'o'
         self.board = board
         if len(self.board.apples) < 10:
             self.spawn_apple()
@@ -594,7 +611,7 @@ class SnakeJudge(Judge):
 
         previous_errors = self.r.get('snake:%s:err' % (key,)) or ''
         previous_errors = previous_errors.decode('utf-8') + err
-        previous_errors = previous_errors.split('\n')[-100:]
+        previous_errors = previous_errors.split('\n')[-1000:]
         errors = u"\n".join(previous_errors)
         self.r.set('snake:%s:err' % (key,), errors.encode('utf-8'))
 
