@@ -1,6 +1,6 @@
-var start_client = function start_client(){
-var WIDTH = 80;
-var HEIGHT = 60;
+var start_client = function start_client(width, height){
+var WIDTH = width || 80;
+var HEIGHT = height || 60;
 
 var board = {snakes: [], apples: []};
 var canvas = document.getElementById('canvas');
@@ -9,8 +9,11 @@ var $leaderboard = $('#leaderboard');
 var $error_log = $('#error_log');
 var REFRESH_INTERVAL = 1000;
 
+var repaint_needed = true;
+
 function reloadBoard() {
     var reload_success = function(data){
+        repaint_needed = true;
         board = data;
         setTimeout(reloadBoard, REFRESH_INTERVAL);
     };
@@ -31,6 +34,7 @@ function reloadBoard() {
 
 function reloadLeaderboard() {
     var leader_success = function(data){
+        repaint_needed = true;
         $leaderboard.html(data);
         setTimeout(reloadLeaderboard, 5000);
     };
@@ -52,6 +56,7 @@ function reloadErrors() {
         return;
 
     var errors_success = function(data){
+        repaint_needed = true;
         $error_log.html(data);
         setTimeout(reloadErrors, 5000);
     };
@@ -116,7 +121,10 @@ function render() {
 	var requestAnimFrame = window.requestAnimationFrame || mozRequestAnimationFrame;
 	(function animloop() {
 	    requestAnimFrame(animloop);
-	    render();
+            if (repaint_needed) {
+                render();
+                repaint_needed = false;
+            };
 	}());
 
 };

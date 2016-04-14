@@ -3,9 +3,6 @@
 <head>
     <title>Snakes!</title>
     <link rel="stylesheet" href="/static/snakes_app/st.css"/>
-<script type="text/javascript" src="/static/snakes_app/jquery-2.1.0.min.js"></script>
-<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js" charset="utf-8"></script>
-<script type="text/javascript" src="/static/snakes_app/client.js"></script>
 </head>
 <body>
 <div id="leaderboard"></div>
@@ -29,6 +26,10 @@
     <input type="submit" name="Dalej!" value="Dalej!"/>
 </form>
 {% endif %}
+
+<script type="text/javascript" src="/static/snakes_app/jquery-2.1.0.min.js"></script>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/ace/1.2.3/ace.js" charset="utf-8"></script>
+<script type="text/javascript" src="/static/snakes_app/client.js"></script>
 <script type="text/javascript">
     {% if key %}
     var KEY = "{{ key }}";
@@ -53,7 +54,7 @@ editor.getSession().on('change', function(){
   textarea.val(editor.getSession().getValue());
 });
 {% endif %}
-start_client();
+start_client({{ WIDTH }}, {{ HEIGHT }});
 
 });
 </script>

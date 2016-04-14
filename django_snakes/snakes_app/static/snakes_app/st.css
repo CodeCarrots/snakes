@@ -33,3 +33,7 @@ textarea {
     max-height: 500px;
     overflow: auto;
 }
+
+#editor {
+  height: 600px;
+}

@@ -44,8 +44,8 @@ def key_board(request, key):
         snake_name = snake_name.decode('utf-8')
         snake_code = r.get('snake:%s:code' % key).decode('utf-8')
         # snake_code = (r.get('snake:%s:code' % key) or script).decode('utf-8')
-        snake_color = (r.get('snake:%s:color' % key) or '#fff').decode('utf-8')
-        snake_err = (r.get('snake:%s:err' % key) or '').decode('utf-8')
+        snake_color = (r.get('snake:%s:color' % key) or b'#fff').decode('utf-8')
+        snake_err = (r.get('snake:%s:err' % key) or b'').decode('utf-8')
 
     return render(
         request,
@@ -74,7 +74,7 @@ def check_board(request):
     if key is None:
         return snakes
 
-    snake_err = (r.get('snake:%s:err' % key) or '').decode('utf-8')
+    snake_err = (r.get('snake:%s:err' % key) or b'').decode('utf-8')
     snaker_err_lines = snake_err.split("\n")[-20:]
 
     for snake in snakes['snakes']:
@@ -95,22 +95,22 @@ def get_snake_name(key):
 
 def get_snake_color(key):
     name = r.get('snake:%s:color' % key)
-    return 'black' if name is None else name
+    return 'black' if name is None else name.decode('utf-8')
 
 
 def leaderboard(request):
     members = [
         {
-           'name': get_snake_name(s[0]),
+           'name': get_snake_name(s[0].decode('utf-8')),
            'score': int(s[1]),
-           'color': get_snake_color(s[0])
+           'color': get_snake_color(s[0].decode('utf-8'))
         }
         for s in r.zrevrange('leaderboard', 0, -1, withscores=True)]
     return render(request, 'snakes_app/leaderboard.html', dict(members=members))
 
 
 def error_log(request, key):
-    snake_errors = r.get('snake:%s:err' % (key,))
+    snake_errors = r.get('snake:%s:err' % (key,)) or b''
     return HttpResponse(snake_errors)
 
 
@@ -128,9 +128,9 @@ def reload_code(request):
         request.POST['slave_code']
     ))
     r.rpush('commands', command.encode('utf-8'))
-    r.set('snake:%s:name' % request.POST['slave_id'].encode('utf-8'),
+    r.set('snake:%s:name' % request.POST['slave_id'],
           request.POST['slave_name'].encode('utf-8'))
-    r.set('snake:%s:code' % request.POST['slave_id'].encode('utf-8'),
+    r.set('snake:%s:code' % request.POST['slave_id'],
           request.POST['slave_code'].encode('utf-8'))
 
     dest = reverse('board', kwargs={'key':request.POST['slave_id']})

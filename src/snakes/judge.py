@@ -3,22 +3,23 @@ from __future__ import print_function
 import colorsys
 import os
 import pwd
+import grp
 import random
 import resource
 import signal
 import stat
-import StringIO
+from io import StringIO
 import subprocess
 import threading
 import time
 import json
 import fcntl
-import Queue
+import queue as Queue
 from collections import namedtuple, deque, defaultdict
 import redis
 import codecs
 import logging
-from db import get_db
+from .db import get_db
 from snakes.example import get_example, WIDTH, HEIGHT
 
 logging.basicConfig(level=logging.INFO)
@@ -140,12 +141,13 @@ class Slave(object):
         self.env = env
         self.script = script
         self.cell = os.path.join(JAIL_ROOT, self.env)
-        self.stderr = StringIO.StringIO()
+        self.stderr = StringIO()
         self.last_err = ''
         self.slot = slot
 
     def instrument_process(self):
         uid = pwd.getpwnam(self.env).pw_uid
+        gid = grp.getgrnam(SLAVE_GROUP).gr_gid
         os.chdir(self.cell)
         os.chroot(self.cell)
 
@@ -154,6 +156,8 @@ class Slave(object):
         # resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
         os.nice(15)
 
+        os.setgroups([])
+        os.setgid(gid)
         os.setuid(uid)
 
     def run(self):
@@ -204,14 +208,16 @@ class Slave(object):
                 logger.exception("Failed to resume %s" % (self.cell,))
                 return '', ''
             try:
-                self.process.stdin.write(message)
+                self.process.stdin.write(message.encode('utf-8'))
             except IOError as exc:
                 logger.exception("Failed to communicate with %s" % (self.cell,))
                 return '', ''
 
             try:
-                result = self.process.stdout.readline()
+                result = self.process.stdout.readline().decode('utf-8')
                 err = self.process.stderr.read()
+                if err is not None:
+                    err = err.decode('utf-8')
             except IOError as exc:
                 if exc.errno == 11:
                     pass
@@ -295,14 +301,16 @@ class Board(object):
         board.apples = set(self.apples)
         return board
 
-    def __getitem__(self, (x, y)):
+    def __getitem__(self, x_y):
+        (x, y) = x_y
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return '#'
         if x == self.h_x and y == self.h_y:
             return 'H'
         return self.fields[y][x]
 
-    def __setitem__(self, (x, y), value):
+    def __setitem__(self, x_y, value):
+        (x, y) = x_y
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return
 
@@ -417,14 +425,17 @@ class SnakeJudge(Judge):
         self.turn = 0
         self.snakes = {}
         self.r = get_db()
-        self.leaderboard = dict(self.r.zrevrange('leaderboard', 0, -1, withscores=True))
+        self.leaderboard = {key.decode('utf-8'): score
+                            for (key, score)
+                            in self.r.zrevrange('leaderboard', 0, -1,
+                                                withscores=True)}
         self._load_snakes()
         self._threads = threads
 
     def _load_snakes(self):
         keys = self.r.smembers('keys')
         for key in keys:
-            self.command_add_snake(key)
+            self.command_add_snake(key.decode('utf-8'))
 
     def add_slave_snake(self, script, key, color):
         slave = super(SnakeJudge, self).add_slave(script)
@@ -481,7 +492,7 @@ class SnakeJudge(Judge):
                 board[part.x, part.y] = '#'
                 
         for apple in self.board.apples:
-	    board[apple.x, apple.y] = 'o'
+            board[apple.x, apple.y] = 'o'
         self.board = board
         if len(self.board.apples) < 10:
             self.spawn_apple()
@@ -554,6 +565,9 @@ class SnakeJudge(Judge):
             v = 0.8
             r, g, b = colorsys.hsv_to_rgb(h, s, v)
             color = ('#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))).lower()
+        else:
+            color = color.decode('utf-8')
+
         self.r.set('snake:%s:color' % key, color)
         script = self.get_snake_code(key)
         name = self.r.get('snake:%s:name' % key)
@@ -590,7 +604,7 @@ class SnakeJudge(Judge):
                 self.r.zadd('leaderboard', len(snake.parts), key)
 
     def move_snake(self, key, slave, snake):
-        logger.info("%s: %s" % (key[:3], slave))
+        logger.debug("%s: %s" % (key[:3], slave))
         if slave.process.poll() is not None:
             logger.info("%s: DEAD - process" % (key,))
             logger.info("%s: Reviving..." % (key,))
@@ -607,35 +621,39 @@ class SnakeJudge(Judge):
         board[(snake.head.x, snake.head.y)] = 'H'
         r, err = slave.send(str(board) + '\n', 5)
         #self.board[(snake.head.x, snake.head.y)] = '#'
-        logger.info("%s: move %s" % (key, r[:50]))
+        logger.debug("%s: move %s" % (key, r[:50]))
 
-        previous_errors = self.r.get('snake:%s:err' % (key,)) or ''
-        previous_errors = previous_errors.decode('utf-8') + err
-        previous_errors = previous_errors.split('\n')[-1000:]
-        errors = u"\n".join(previous_errors)
-        self.r.set('snake:%s:err' % (key,), errors.encode('utf-8'))
+        if err is not None:
+            previous_errors = self.r.get('snake:%s:err' % (key,)) or b''
+            previous_errors = previous_errors.decode('utf-8') + err
+            previous_errors = previous_errors.split('\n')[-1000:]
+            errors = u"\n".join(previous_errors)
+            self.r.set('snake:%s:err' % (key,), errors.encode('utf-8'))
 
-        message = ''
+        # message = ''
         if r not in ('left', 'right', 'up', 'down'):
             logger.info("%s: killing because %r is not a direction" % (key, r[:50]))
             slave.kill_process()
             self.kill_snake(snake, clear=True)
-            if r:
-                message = 'Received invalid command %r\n' % (r,)
+            # if r:
+            #     message = 'Received invalid command %r\n' % (r,)
             return
 
         snake.direction = r
         head, tail = snake.move()
         return head, tail
-  
-    def wait(self, sec):
-        while True:
-	    cur = time.time()
-	    if time.time() > self.start + sec:
-	        self.start = self.start + sec
-	        break
-	    time.sleep(0.01)
-        
+
+    def wait(self, delay):
+        now = time.time()
+        wait_until = self.start + delay
+        if now <= wait_until:
+            real_delay = wait_until - now
+            logger.info('sleeping %.3fs...', real_delay)
+            time.sleep(real_delay)
+        else:
+            logger.info('not sleeping')
+        self.start = wait_until
+
     def run_infinite(self, queue):
         self.start = time.time()
         while True:
@@ -740,6 +758,12 @@ class RedisCommandThread(threading.Thread):
 #"""
 
 
+# an explicit SIGTERM handler is needed when judge.py is the main
+# docker container process...
+def sigterm_handler(_signum, _frame):
+    raise KeyboardInterrupt()
+
+
 def main():
     # with open('keys', 'r') as keys_file:
     #     keys = keys_file.read().split("\n")
@@ -756,6 +780,8 @@ def main():
     thread = RedisCommandThread(judge)
     thread.daemon = True
     thread.start()
+
+    signal.signal(signal.SIGTERM, sigterm_handler)
 
     judge.run()
 
