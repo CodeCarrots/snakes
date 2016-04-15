@@ -122,16 +122,19 @@ def create_slave_env(name):
     safe_makedirs(os.path.join(cell, 'dev'), 0o755)
     print("mkdir dev", cell)
     try:
-        os.mknod(os.path.join(cell, 'dev', 'random'), 0o644 | stat.S_IFCHR, os.makedev(1, 8))
-        os.mknod(os.path.join(cell, 'dev', 'urandom'), 0o644 | stat.S_IFCHR, os.makedev(1, 9))
+        os.mknod(os.path.join(cell, 'dev', 'random'),
+                 0o644 | stat.S_IFCHR, os.makedev(1, 8))
+        os.mknod(os.path.join(cell, 'dev', 'urandom'),
+                 0o644 | stat.S_IFCHR, os.makedev(1, 9))
     except OSError:
         pass
     print("slave env created", cell)
 
 
 def get_process_children(pid):
-    process = subprocess.Popen('ps --no-headers -o pid --ppid %d' % pid, shell=True,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen('ps --no-headers -o pid --ppid %d' % pid,
+                               shell=True, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     return [int(p) for p in stdout.split()]
 
@@ -151,8 +154,10 @@ class Slave(object):
         os.chdir(self.cell)
         os.chroot(self.cell)
 
-        resource.setrlimit(resource.RLIMIT_DATA, (32 * 1024 * 1024, 32 * 1024 * 1024))
-        resource.setrlimit(resource.RLIMIT_STACK, (8 * 1024 * 1024, 8 * 1024 * 1024))
+        resource.setrlimit(resource.RLIMIT_DATA,
+                           (32 * 1024 * 1024, 32 * 1024 * 1024))
+        resource.setrlimit(resource.RLIMIT_STACK,
+                           (8 * 1024 * 1024, 8 * 1024 * 1024))
         # resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
         os.nice(15)
 
@@ -161,7 +166,8 @@ class Slave(object):
         os.setuid(self.uid)
 
     def run(self):
-        with codecs.open(os.path.join(self.cell, 'script.py'), 'w', encoding='utf-8') as f:
+        with codecs.open(os.path.join(self.cell, 'script.py'), 'w',
+                         encoding='utf-8') as f:
             f.write(self.script)
         os.chmod(os.path.join(self.cell, 'script.py'), 0o755)
         logger.info("running %s" % (self.cell,))
@@ -290,7 +296,8 @@ class Board(object):
         self.fields = [['.'] * width for _ in range(height)]
         self.h_x = None
         self.h_y = None
-        #self.empty_fields = set(Point(x, y) for x in range(width) for y in range(height))
+        # self.empty_fields = set(Point(x, y) for x in range(width)
+        #                         for y in range(height))
         self.apples = set()
 
     def copy(self):
@@ -354,7 +361,8 @@ class Board(object):
 
 
 class Snake(object):
-    def __init__(self, parts=None, direction=None, color=None, name='annonymous', key=None):
+    def __init__(self, parts=None, direction=None, color=None,
+                 name='annonymous', key=None):
         self.parts = deque(parts) if parts is not None else deque([Point(4, 4)])
         self.direction = direction if direction is not None else 'right'
         self.ate_apple = False
@@ -411,7 +419,8 @@ class Worker(threading.Thread):
             try:
                 func(*args, **kargs)
             except Exception as exc:
-                logger.exception("Error while executing task\n%r\n%r" % (args, kargs))
+                logger.exception("Error while executing task\n%r\n%r",
+                                 args, kargs)
             self.tasks.task_done()
 
 
@@ -564,7 +573,8 @@ class SnakeJudge(Judge):
             s = 1
             v = 0.8
             r, g, b = colorsys.hsv_to_rgb(h, s, v)
-            color = ('#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))).lower()
+            color = ('#%02x%02x%02x' % (int(r*255), int(g*255),
+                                        int(b*255))).lower()
         else:
             color = color.decode('utf-8')
 
@@ -632,7 +642,8 @@ class SnakeJudge(Judge):
 
         # message = ''
         if r not in ('left', 'right', 'up', 'down'):
-            logger.info("%s: killing because %r is not a direction" % (key, r[:50]))
+            logger.info("%s: killing because %r is not a direction",
+                        key, r[:50])
             slave.kill_process()
             self.kill_snake(snake, clear=True)
             # if r:
