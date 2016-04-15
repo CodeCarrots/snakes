@@ -12,7 +12,7 @@ with open(path.join(base_path, 'README.md')) as f:
 setup(
     name='snakes',
 
-    version='0.0.12-dev',
+    version='0.0.13-dev',
 
     description='Corewars-like snakes game server code',
     long_description=long_description,

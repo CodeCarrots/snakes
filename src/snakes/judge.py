@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import colorsys
 import os
+import tempfile
 import pwd
 import grp
 import random
@@ -64,10 +65,13 @@ def create_slave_group():
     #                            '-j', 'DROP'])
 
 
-def create_slave_env(name):
+def create_slave_env(name, force=False):
     cell = os.path.join(JAIL_ROOT, name)
     if os.path.exists(cell):
-        return
+        if not force:
+            return
+        tmpdir = tempfile.mkdtemp(dir=JAIL_ROOT, prefix=('old-%s-' % name))
+        os.rename(cell, os.path.join(tmpdir, name))
 
     safe_makedirs(JAIL_ROOT, mode=0o755)
     safe_makedirs(cell)
@@ -255,6 +259,7 @@ class Judge(object):
         create_slave_group()
         self.slaves = []
         self.used_slots = set()
+        self.force_create_envs = False
 
     def get_free_slot(self):
         i = 0
@@ -268,7 +273,7 @@ class Judge(object):
     def add_slave(self, slave_code):
         slot = self.get_free_slot()
         slave_name = SLAVE_USERNAME_PATTERN.format(slot)
-        create_slave_env(slave_name)
+        create_slave_env(slave_name, force=self.force_create_envs)
         slave = Slave(slave_name, slave_code, slot)
         self.slaves.append(slave)
         return slave
@@ -443,8 +448,10 @@ class SnakeJudge(Judge):
 
     def _load_snakes(self):
         keys = self.r.smembers('keys')
+        self.force_create_envs = True
         for key in keys:
             self.command_add_snake(key.decode('utf-8'))
+        self.force_create_envs = False
 
     def add_slave_snake(self, script, key, color):
         slave = super(SnakeJudge, self).add_slave(script)
