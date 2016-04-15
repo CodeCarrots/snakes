@@ -144,10 +144,10 @@ class Slave(object):
         self.stderr = StringIO()
         self.last_err = ''
         self.slot = slot
+        self.uid = pwd.getpwnam(self.env).pw_uid
+        self.gid = grp.getgrnam(SLAVE_GROUP).gr_gid
 
     def instrument_process(self):
-        uid = pwd.getpwnam(self.env).pw_uid
-        gid = grp.getgrnam(SLAVE_GROUP).gr_gid
         os.chdir(self.cell)
         os.chroot(self.cell)
 
@@ -157,8 +157,8 @@ class Slave(object):
         os.nice(15)
 
         os.setgroups([])
-        os.setgid(gid)
-        os.setuid(uid)
+        os.setgid(self.gid)
+        os.setuid(self.uid)
 
     def run(self):
         with codecs.open(os.path.join(self.cell, 'script.py'), 'w', encoding='utf-8') as f:
