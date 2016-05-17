@@ -46,12 +46,12 @@ def players_func(args):
 
 def clear_program(args):
     if args.all:
-        keys = r.smembers('keys')
+        keys = [key.decode('utf-8') for key in r.smembers('keys')]
     elif args.code:
         keys = [args.code]
     else:
         raise Exception("--code or --all required")
-    keys = ['snake:%s:code' % key.decode('utf-8') for key in keys]
+    keys = ['snake:%s:code' % key for key in keys]
 
     for key in keys:
         r.set(key, get_example())
