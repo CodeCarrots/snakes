@@ -12,22 +12,21 @@ with open(path.join(base_path, 'README.md')) as f:
 setup(
     name='snakes',
 
-    version='0.0.13-dev',
+    version='0.0.14',
 
-    description='Corewars-like snakes game server code',
+    description='Corewars-like snakes game server',
     long_description=long_description,
 
-    url='http://git.plocharz.info/summary/snakes.git',
+    url='https://github.com/CodeCarrots/snakes',
 
-    author='Krzysztof Płocharz',
-    author_email='krzysztof@plocharz.info',
-
-    license='???',
+    license='MIT License',
 
     classifiers=[
         'Development Status :: 3 - Alpha',
 
         'Intended Audience :: Developers',
+
+        'License :: OSI Approved :: MIT License',
 
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
