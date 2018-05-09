@@ -18,6 +18,6 @@ def move(board):
 
 # Don't touch (unless you know what you're doing :-))
 while True:
-    board = [sys.stdin.readline() for _ in range(HEIGHT)]
+    board = [sys.stdin.readline().rstrip('\n') for _ in range(HEIGHT)]
     sys.stdout.write(move(board))
     sys.stdout.write('\n')
