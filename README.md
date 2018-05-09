@@ -16,7 +16,7 @@ Game rules
 Some specifics of the implemented variant:
 
 - all snakes occupy the same single board and move simultaneously in
-  synchronized discreete-time steps;
+  synchronized discrete-time steps;
 
 - snake dies if its head attempts to leave the board boundaries or
   move to a field occupied by a snake (including itself);
@@ -62,7 +62,7 @@ list of strings, e.g.:
  '....#H...']
 ```
 
-Each character in the board representation describes a sigle board field:
+Each character in the board representation describes a single board field:
 
 - `.`: empty field - safe to move there;
 
@@ -82,7 +82,7 @@ describing a valid move. Valid moves are: `left`, `right`, `up`,
 Mentors
 -------
 
-Each snake is run in a separate process, in an enviroment that
+Each snake is run in a separate process, in an environment that
 attempts to provide isolation from other snakes' processes - the goal
 is for the contestants to win by implementing a better algorithm and
 not by hacking other snakes ;)
@@ -108,15 +108,15 @@ Admin
 The server's runtime consists of at least 3 processes: redis server,
 snakes manager server and a django server. You might want a front-end
 HTTP server, as well. The snake manager server requires some pretty
-specific enviroment to do its job properly - see [snakes-docker][1]
+specific environment to do its job properly - see [snakes-docker][1]
 for some help setting-up and running.
 
 Once everything is running, managing the game is done through the
 `snakes-manage` script (run in a way that allows it to communicate
 with the redis server). Add some snakes with `snakes-manage add_snake
 ...` ("snake key" should be a random string, preferably of length 6+,
-that acts as a snake identificator and a password at the same time,
-should be kept somewhat secret) then get the unique urls for them with
+that acts as a snake identifier and a password at the same time,
+should be kept somewhat secret) then get the unique URLs for them with
 `snakes-manage players ...`.
 
 `-h` is your friend.
