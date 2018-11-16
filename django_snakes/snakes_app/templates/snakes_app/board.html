@@ -1,3 +1,4 @@
+{% load static from staticfiles %}
 <!doctype html>
 <html>
 <head>
@@ -27,9 +28,9 @@
 </form>
 {% endif %}
 
-<script type="text/javascript" src="/static/snakes_app/jquery-2.1.0.min.js"></script>
-<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/ace/1.2.3/ace.js" charset="utf-8"></script>
-<script type="text/javascript" src="/static/snakes_app/client.js"></script>
+<script type="text/javascript" src="{% static 'snakes_app/jquery.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'snakes_app/ace.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'snakes_app/client.js' %}"></script>
 <script type="text/javascript">
     {% if key %}
     var KEY = "{{ key }}";
@@ -42,6 +43,7 @@
 $(function(){
 {% if key %}
     console.log("setup editor");
+    ace.config.set("basePath", "{% static 'snakes_app' %}")
     var editor = ace.edit("editor");
     editor.setTheme("ace/theme/monokai");
     editor.getSession().setMode("ace/mode/python");

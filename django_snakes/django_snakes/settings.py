@@ -24,7 +24,7 @@ DEBUG = True
 
 TEMPLATE_DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -51,6 +51,14 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'django_snakes.urls'
 
 WSGI_APPLICATION = 'django_snakes.wsgi.application'
+
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'APP_DIRS': True,
+    },
+]
 
 
 # Database

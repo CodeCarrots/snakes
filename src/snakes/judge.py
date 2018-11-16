@@ -20,7 +20,7 @@ from collections import namedtuple, deque, defaultdict
 import redis
 import codecs
 import logging
-from .db import get_db
+from snakes.db import get_db
 from snakes.example import get_example, WIDTH, HEIGHT
 
 logging.basicConfig(level=logging.INFO)
@@ -598,6 +598,9 @@ class SnakeJudge(Judge):
         try:
             while True:
                 command_args = self.commands.get_nowait()
+                if not command_args:
+                    continue
+
                 command = command_args[0]
                 args = command_args[1:]
                 if command == 'reload_slave':

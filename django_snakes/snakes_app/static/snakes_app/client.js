@@ -107,11 +107,13 @@ function render() {
         c.fill();
     }
     c.fillStyle = '#FF5555';
-    for (i = 0; i < board.apples.length; i++) {
-        apple = board.apples[i];
-        c.beginPath();
-        c.arc(apple[0] * 10 + 5, apple[1] * 10 + 5, 4, 0, Math.PI*2);
-        c.fill();
+    if (board.apples) {
+        for (i = 0; i < board.apples.length; i++) {
+            apple = board.apples[i];
+            c.beginPath();
+            c.arc(apple[0] * 10 + 5, apple[1] * 10 + 5, 4, 0, Math.PI*2);
+            c.fill();
+        }
     }
 }
 

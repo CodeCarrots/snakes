@@ -35,7 +35,7 @@ setup(
     packages=['snakes'],
     package_dir={'': 'src'},
 
-    install_requires=['redis>=2.10.5'],
+    install_requires=open(path.join(base_path, 'requirements.txt')).readlines(),
 
     entry_points={
         'console_scripts': [

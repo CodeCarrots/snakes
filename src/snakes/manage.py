@@ -10,6 +10,10 @@ r = get_db()
 
 def show_board(args):
     board = r.get('board')
+    if not board:
+        print('No board(s)')
+        return
+
     print(board.decode('utf-8'))
     while args.repeat:
         time.sleep(0.5)
@@ -134,7 +138,8 @@ def main():
     board.set_defaults(func=show_board)
 
     parsed = parser.parse_args()
-    parsed.func(parsed)
+    if hasattr(parsed, 'func'):
+        parsed.func(parsed)
 
 
 if __name__ == '__main__':
