@@ -1,9 +1,9 @@
-{% load static from staticfiles %}
+{% load static %}
 <!doctype html>
 <html>
 <head>
     <title>Snakes!</title>
-    <link rel="stylesheet" href="/static/snakes_app/st.css"/>
+    <link rel="stylesheet" href="{% static 'snakes_app/st.css' %}"/>
 </head>
 <body>
 <div id="leaderboard"></div>

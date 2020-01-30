@@ -1,33 +1,33 @@
 <!doctype html>
 <html>
-    <head>
+	<head>
 	<title>Snakes!</title>
 	<style>
-	    body { margin: 10px; background-color: #CCC; width: 1020px; font-family: Helvetica, Arial, sans-serif; font-size: 14px }
-	    canvas { background-color: #FFF; width: 800px; height: 600px; border: 1px solid #999 }
-	    #leaderboard { float: right; width: 200px }
-	    input[type=text], textarea { display: block; width: 200px; border: 1px solid #999 }
-	    textarea { width: 400px }
+		body { margin: 10px; background-color: #CCC; width: 1020px; font-family: Helvetica, Arial, sans-serif; font-size: 14px }
+		canvas { background-color: #FFF; width: 800px; height: 600px; border: 1px solid #999 }
+		#leaderboard { float: right; width: 200px }
+		input[type=text], textarea { display: block; width: 200px; border: 1px solid #999 }
+		textarea { width: 400px }
 </style>
 
-    </head>
-    <body>
+	</head>
+	<body>
 	<div id="leaderboard"></div>
 	<canvas width="800" height="600" id="canvas">{{ board }}</canvas>
 	<form action="/reload_slave" method="POST">
-	    <label for="slave_name">Nazwa <input id="slave_name" type="text" name="slave_name" value="{{ name }}" /></label>
-	    <label for="slave_id">Klucz <input type="text" name="slave_id" value="{{ key }}" /></label>
-	    <label for="slave_code">Kod 
+		<label for="slave_name">Nazwa <input id="slave_name" type="text" name="slave_name" value="{{ name }}" /></label>
+		<label for="slave_id">Klucz <input type="text" name="slave_id" value="{{ key }}" /></label>
+		<label for="slave_code">Kod 
 <textarea name="slave_code" rows="24" cols="80">{{ code }}</textarea>
 </label>
 <pre>
 {{ err}}
 </pre>
-	    <input type="submit" name="Dalej!" value="Dalej!" />
+		<input type="submit" name="Dalej!" value="Dalej!" />
 	</form>
 	<script type="text/javascript">
-	    var COLOR = '{{ color }}';
+		var COLOR = '{{ color }}';
 	</script>
 	<script type="text/javascript" src="/static/client.js"></script>
-    </body>
+	</body>
 </html>
