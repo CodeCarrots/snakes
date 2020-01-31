@@ -80,11 +80,6 @@ def create_slave_env(name, force=False):
     safe_makedirs(os.path.join(cell, 'lib64'))
     safe_makedirs(os.path.join(cell, 'usr'))
     run_command([
-        'ln',
-        os.path.join(JAIL_ZYGOTE, 'python'),
-        os.path.join(cell, 'python')
-    ])
-    run_command([
         'mount', '--bind',
         os.path.join(JAIL_ZYGOTE, 'bin'),
         os.path.join(cell, 'bin')
@@ -157,6 +152,7 @@ class Slave(object):
     def instrument_process(self):
         os.chdir(self.cell)
         os.chroot(self.cell)
+        os.chdir('/')
 
         resource.setrlimit(resource.RLIMIT_DATA,
                            (32 * 1024 * 1024, 32 * 1024 * 1024))
@@ -175,13 +171,16 @@ class Slave(object):
             f.write(self.script)
         os.chmod(os.path.join(self.cell, 'script.py'), 0o755)
         logger.info("running %s" % (self.cell,))
-        self.process = subprocess.Popen(['./python', 'script.py'],
+        self.process = subprocess.Popen(['./bin/python', 'script.py'],
                                         shell=False,
                                         stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE,
-                                        env={'PYTHONUSERBASE': '/nonexistent',
-                                             'PYTHONUNBUFFERED': 'x'},
+                                        env={
+                                            'PYTHONHOME': '/usr',
+                                            'PYTHONUSERBASE': '/nonexistent',
+                                            'PYTHONUNBUFFERED': 'x',
+                                        },
                                         close_fds=True,
                                         preexec_fn=self.instrument_process)
         fcntl.fcntl(self.process.stderr.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
@@ -524,7 +523,7 @@ class SnakeJudge(Judge):
         self.r.delete('leaderboard')
         for key, (slave, snake) in self.snakes.items():
             self.leaderboard[key] = 0
-            self.r.zadd('leaderboard', 0, key)
+        self.r.zadd('leaderboard', self.leaderboard)
 
     def reset_snake(self, snake, slave, key):
         self.kill_snake(snake, clear=True)
@@ -621,7 +620,7 @@ class SnakeJudge(Judge):
         for key, (slave, snake) in self.snakes.items():
             if self.leaderboard.get(key, 0) < len(snake.parts):
                 self.leaderboard[key] = len(snake.parts)
-                self.r.zadd('leaderboard', len(snake.parts), key)
+        self.r.zadd('leaderboard', self.leaderboard)
 
     def move_snake(self, key, slave, snake):
         logger.debug("%s: %s" % (key[:3], slave))
