@@ -1,12 +1,14 @@
-from django.conf.urls import patterns, include, url
+from django.conf.urls import include, re_path
+
+from snakes_app import views
 
 
-urlpatterns = patterns('',
+urlpatterns = [
     # Examples:
-    url(r'^$', 'snakes_app.views.board', name='board'),
-    url(r'^snake/(?P<key>[a-zA-Z0-9]+)/$', 'snakes_app.views.key_board', name='board'),
-    url(r'^errors/(?P<key>[a-zA-Z0-9]+)/$', 'snakes_app.views.error_log', name='error_log'),
-    url(r'^board/', 'snakes_app.views.check_board', name='board-json'),
-    url(r'^leaderboard/', 'snakes_app.views.leaderboard', name='leaderboard-json'),
-    url(r'^reload/', 'snakes_app.views.reload_code', name='reload'),
-)
+    re_path(r'^$', views.board, name='board'),
+    re_path(r'^snake/(?P<key>[a-zA-Z0-9]+)/$', views.key_board, name='board'),
+    re_path(r'^errors/(?P<key>[a-zA-Z0-9]+)/$', views.error_log, name='error_log'),
+    re_path(r'^board/', views.check_board, name='board-json'),
+    re_path(r'^leaderboard/', views.leaderboard, name='leaderboard-json'),
+    re_path(r'^reload/', views.reload_code, name='reload'),
+]

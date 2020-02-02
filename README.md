@@ -108,7 +108,7 @@ Admin
 The server's runtime consists of at least 3 processes: redis server,
 snakes manager server and a django server. You might want a front-end
 HTTP server, as well. The snake manager server requires some pretty
-specific environment to do its job properly - see [snakes-docker][1]
+specific environment to do its job properly - see [snakes-docker][3]
 for some help setting-up and running.
 
 Once everything is running, managing the game is done through the
@@ -122,4 +122,4 @@ should be kept somewhat secret) then get the unique URLs for them with
 `-h` is your friend.
 
 
-[1]: https://github.com/CodeCarrots/snakes-docker
+[3]: https://github.com/CodeCarrots/snakes-docker

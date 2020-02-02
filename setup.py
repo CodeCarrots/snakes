@@ -12,7 +12,7 @@ with open(path.join(base_path, 'README.md')) as f:
 setup(
     name='snakes',
 
-    version='0.0.14',
+    version='0.0.15',
 
     description='Corewars-like snakes game server',
     long_description=long_description,
@@ -29,13 +29,13 @@ setup(
         'License :: OSI Approved :: MIT License',
 
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.8',
     ],
 
     packages=['snakes'],
     package_dir={'': 'src'},
 
-    install_requires=['redis>=2.10.5'],
+    install_requires=open(path.join(base_path, 'requirements.txt')).readlines(),
 
     entry_points={
         'console_scripts': [

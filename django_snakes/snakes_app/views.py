@@ -1,6 +1,6 @@
-from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
+from django.urls import reverse
 
 import json
 from snakes.db import get_db
@@ -66,6 +66,9 @@ def key_board(request, key):
 @json_response
 def check_board(request):
     snakes = r.get('snakes')
+    if not snakes:
+        return {'snakes': []}
+
     key = request.GET.get('KEY')
     snakes = json.loads(snakes.decode('utf-8'))
     if snakes is None:
@@ -115,10 +118,10 @@ def error_log(request, key):
 
 
 def reload_code(request):
-    if (';' in request.POST['slave_name']
-        or len(request.POST['slave_id']) == 0
-        or len(request.POST['slave_name']) == 0
-        or len(request.POST['slave_code']) == 0):
+    if (';' in request.POST.get('slave_name', '')
+        or len(request.POST.getlist('slave_id')) == 0
+        or len(request.POST.getlist('slave_name')) == 0
+        or len(request.POST.getlist('slave_code')) == 0):
         return redirect(reverse('board'))
 
     command = json.dumps((
