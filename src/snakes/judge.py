@@ -1,4 +1,4 @@
-from __future__ import print_function
+'''Judge module'''
 
 import colorsys
 import os

@@ -23,7 +23,7 @@ function reloadBoard() {
     };
 
     $.ajax({
-        url: '/snakes_app/board/?KEY=' + KEY,
+        url: '/snakes_app/board/?KEY=' + KEY + '&_=' + new Date().getTime(),
         success: reload_success,
         error: reload_error,
         dataType: 'json'
@@ -44,7 +44,7 @@ function reloadLeaderboard() {
     };
 
     $.ajax({
-        url: '/snakes_app/leaderboard/',
+        url: '/snakes_app/leaderboard/?_=' + new Date().getTime(),
         success: leader_success,
         error: leader_error
     });
@@ -66,7 +66,7 @@ function reloadErrors() {
     };
 
     $.ajax({
-        url: '/snakes_app/errors/' + KEY + '/',
+        url: '/snakes_app/errors/' + KEY + '/?_=' + new Date().getTime(),
         success: errors_success,
         error: errors_error
     });

@@ -2,29 +2,29 @@
 <!doctype html>
 <html>
 <head>
-    <title>Snakes!</title>
-    <link rel="stylesheet" href="{% static 'snakes_app/st.css' %}"/>
+	<title>Snakes!</title>
+	<link rel="stylesheet" href="{% static 'snakes_app/st.css' %}"/>
 </head>
 <body>
 <div id="leaderboard"></div>
 <canvas width="{{ WIDTH }}0" height="{{ HEIGHT }}0" id="canvas">{{ board }}</canvas>
 {% if key %}
 <form action="/snakes_app/reload/" method="POST">
-    {% csrf_token %}
-    <label for="slave_name">
-        Nazwa
-        <input id="slave_name" type="text" name="slave_name" value="{{ name }}"/>
-    </label>
-    <input type="hidden" name="slave_id" value="{{ key }}"/>
-    <label for="slave_code">
-        Kod
-        <textarea name="slave_code" rows="24" cols="80">{{ code }}</textarea>
-        <div id="editor">test</div>
-    </label>
+	{% csrf_token %}
+	<label for="slave_name">
+		Nazwa
+		<input id="slave_name" type="text" name="slave_name" value="{{ name }}"/>
+	</label>
+	<input type="hidden" name="slave_id" value="{{ key }}"/>
+	<label for="slave_code">
+		Kod
+		<textarea name="slave_code" rows="24" cols="80">{{ code }}</textarea>
+		<div id="editor">test</div>
+	</label>
 <pre id="error_log">
 
 </pre>
-    <input type="submit" name="Dalej!" value="Dalej!"/>
+	<input type="submit" title="Dalej!" value="Dalej!"/>
 </form>
 {% endif %}
 
@@ -32,33 +32,32 @@
 <script type="text/javascript" src="{% static 'snakes_app/ace.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'snakes_app/client.js' %}"></script>
 <script type="text/javascript">
-    {% if key %}
-    var KEY = "{{ key }}";
-    {% else %}
-    var KEY = null;
-    {% endif %}
+	{% if key %}
+	var KEY = '{{ key }}';
+	{% else %}
+	var KEY = null;
+	{% endif %}
 </script>
 
 <script>
-$(function(){
-{% if key %}
-    console.log("setup editor");
-    ace.config.set("basePath", "{% static 'snakes_app' %}")
-    var editor = ace.edit("editor");
-    editor.setTheme("ace/theme/monokai");
-    editor.getSession().setMode("ace/mode/python");
+	$(function(){
+	{% if key %}
+		console.log('setup editor');
+		ace.config.set('basePath', '{% static "snakes_app" %}')
+		var editor = ace.edit('editor');
+		editor.setTheme('ace/theme/monokai');
+		editor.getSession().setMode('ace/mode/python');
 
-var textarea = $('textarea[name="slave_code"]');
-textarea.hide();
-editor.getSession().setValue(textarea.val());
-console.log(textarea.val());
-editor.getSession().on('change', function(){
-  textarea.val(editor.getSession().getValue());
-});
-{% endif %}
-start_client({{ WIDTH }}, {{ HEIGHT }});
-
-});
+		var textarea = $('textarea[name="slave_code"]');
+		textarea.hide();
+		editor.getSession().setValue(textarea.val());
+		console.log(textarea.val());
+		editor.getSession().on('change', function(){
+			textarea.val(editor.getSession().getValue());
+		});
+		{% endif %}
+		start_client({{ WIDTH }}, {{ HEIGHT }});
+	});
 </script>
 
 </body>
