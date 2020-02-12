@@ -124,6 +124,10 @@ def reload_code(request):
         or len(request.POST.getlist('slave_code')) == 0):
         return redirect(reverse('board'))
 
+    r.set('snake:%s:name' % request.POST['slave_id'],
+          request.POST['slave_name'].encode('utf-8'))
+    r.set('snake:%s:code' % request.POST['slave_id'],
+          request.POST['slave_code'].encode('utf-8'))
     command = json.dumps((
         'reload_slave',
         request.POST['slave_id'],
@@ -131,10 +135,6 @@ def reload_code(request):
         request.POST['slave_code']
     ))
     r.rpush('commands', command.encode('utf-8'))
-    r.set('snake:%s:name' % request.POST['slave_id'],
-          request.POST['slave_name'].encode('utf-8'))
-    r.set('snake:%s:code' % request.POST['slave_id'],
-          request.POST['slave_code'].encode('utf-8'))
 
     dest = reverse('board', kwargs={'key':request.POST['slave_id']})
     return redirect(dest)

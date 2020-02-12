@@ -1,4 +1,4 @@
-from __future__ import print_function
+'''Judge module'''
 
 import colorsys
 import os
@@ -77,7 +77,6 @@ def create_slave_env(name, force=False):
     safe_makedirs(cell)
     safe_makedirs(os.path.join(cell, 'bin'))
     safe_makedirs(os.path.join(cell, 'lib'))
-    safe_makedirs(os.path.join(cell, 'lib64'))
     safe_makedirs(os.path.join(cell, 'usr'))
     run_command([
         'mount', '--bind',
@@ -88,11 +87,6 @@ def create_slave_env(name, force=False):
         'mount', '--bind',
         os.path.join(JAIL_ZYGOTE, 'lib'),
         os.path.join(cell, 'lib')
-    ])
-    run_command([
-        'mount', '--bind',
-        os.path.join(JAIL_ZYGOTE, 'lib64'),
-        os.path.join(cell, 'lib64')
     ])
     run_command([
         'mount', '--bind',
@@ -523,7 +517,8 @@ class SnakeJudge(Judge):
         self.r.delete('leaderboard')
         for key, (slave, snake) in self.snakes.items():
             self.leaderboard[key] = 0
-        self.r.zadd('leaderboard', self.leaderboard)
+        if self.leaderboard:
+            self.r.zadd('leaderboard', self.leaderboard)
 
     def reset_snake(self, snake, slave, key):
         self.kill_snake(snake, clear=True)
@@ -620,7 +615,8 @@ class SnakeJudge(Judge):
         for key, (slave, snake) in self.snakes.items():
             if self.leaderboard.get(key, 0) < len(snake.parts):
                 self.leaderboard[key] = len(snake.parts)
-        self.r.zadd('leaderboard', self.leaderboard)
+        if self.leaderboard:
+            self.r.zadd('leaderboard', self.leaderboard)
 
     def move_snake(self, key, slave, snake):
         logger.debug("%s: %s" % (key[:3], slave))
