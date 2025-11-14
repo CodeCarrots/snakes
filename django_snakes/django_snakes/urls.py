@@ -1,4 +1,4 @@
-from django.conf.urls import include, re_path
+from django.urls import include, re_path
 from django.shortcuts import redirect
 import snakes_app.urls
 
